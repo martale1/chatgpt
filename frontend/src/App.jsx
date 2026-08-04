@@ -1049,56 +1049,124 @@ export default function App() {
     setLogs([]);
     setActiveTab("logs");
 
-    const agenticPipelineLogs = [
-      { agent: "Controller & Orchestrator Agent", msg: `Ricevuta richiesta di analisi per il ticker: ${target}` },
-      { agent: "Prompt Engineering Agent", msg: "Risoluzione del nome aziendale e arricchimento del prompt..." },
-      { 
-        agent: "Prompt Engineering Agent", 
-        msg: `Costruzione del prompt strutturato ottimizzato per ${target}:\n\n==================================================\nDOMANDA INVIATA A CHATGPT:\n--------------------------------------------------\n${simulatedPrompt}\n==================================================` 
-      },
-      { agent: "Playwright Scraper Agent", msg: "Inizializzazione browser Chromium via Playwright..." },
-      { agent: "Playwright Scraper Agent", msg: "Connessione alla sessione Google Chrome attiva (remote-debugging-port: 9222)..." },
-      { agent: "Playwright Scraper Agent", msg: "Connessione stabilita con successo su CDP. Apertura chatgpt.com..." },
-      { agent: "Playwright Scraper Agent", msg: "Rilevato campo di input prompt-textarea. Inserimento prompt strutturato." },
-      { agent: "Playwright Scraper Agent", msg: "Invio prompt a ChatGPT in corso... Monitoraggio risposte." },
-      { agent: "Playwright Scraper Agent", msg: "Rilevato streaming di risposta da parte dell'assistente ChatGPT..." },
-      { 
-        agent: "Playwright Scraper Agent", 
-        msg: `Generazione conclusa con successo. Payload della risposta ricevuta:\n\n==================================================\nRISPOSTA RICEVUTA DA CHATGPT (RAW JSON):\n--------------------------------------------------\n${simulatedResponse}\n==================================================` 
-      },
-      { agent: "JSON Sanitizer & Parser Agent", msg: "Estrazione del blocco JSON. Rilevato blocco di codice markdown." },
-      { agent: "JSON Sanitizer & Parser Agent", msg: "Pulizia tag markdown ed eliminazione di caratteri speciali non validi." },
-      { agent: "JSON Sanitizer & Parser Agent", msg: "Verifica della validità sintattica. JSON Parse completato (0 errori)." },
-      { agent: "Validation & Enrichment Agent", msg: "Controllo dei vincoli dello schema. Tutti i campi obbligatori presenti." },
-      { agent: "Validation & Enrichment Agent", msg: "Verifica e allineamento dei target price analisti e dei livelli di supporto/resistenza." },
-      { agent: "Controller & Orchestrator Agent", msg: `Analisi conclusa con successo per ${target}. Aggiornamento dell'interfaccia utente.` }
-    ];
+    const runFallbackSimulation = () => {
+      const agenticPipelineLogs = [
+        { agent: "Controller & Orchestrator Agent", msg: `[MODALITÀ SIMULATA] Ricevuta richiesta di analisi per il ticker: ${target}` },
+        { agent: "Prompt Engineering Agent", msg: "Risoluzione del nome aziendale e arricchimento del prompt..." },
+        { 
+          agent: "Prompt Engineering Agent", 
+          msg: `Costruzione del prompt strutturato ottimizzato per ${target}:\n\n==================================================\nDOMANDA INVIATA A CHATGPT:\n--------------------------------------------------\n${simulatedPrompt}\n==================================================` 
+        },
+        { agent: "Playwright Scraper Agent", msg: "Inizializzazione browser Chromium via Playwright..." },
+        { agent: "Playwright Scraper Agent", msg: "Connessione alla sessione Google Chrome attiva (remote-debugging-port: 9222)..." },
+        { agent: "Playwright Scraper Agent", msg: "Connessione stabilita con successo su CDP. Apertura chatgpt.com..." },
+        { agent: "Playwright Scraper Agent", msg: "Rilevato campo di input prompt-textarea. Inserimento prompt strutturato." },
+        { agent: "Playwright Scraper Agent", msg: "Invio prompt a ChatGPT in corso... Monitoraggio risposte." },
+        { agent: "Playwright Scraper Agent", msg: "Rilevato streaming di risposta da parte dell'assistente ChatGPT..." },
+        { 
+          agent: "Playwright Scraper Agent", 
+          msg: `Generazione conclusa con successo. Payload della risposta ricevuta:\n\n==================================================\nRISPOSTA RICEVUTA DA CHATGPT (RAW JSON):\n--------------------------------------------------\n${simulatedResponse}\n==================================================` 
+        },
+        { agent: "JSON Sanitizer & Parser Agent", msg: "Estrazione del blocco JSON. Rilevato blocco di codice markdown." },
+        { agent: "JSON Sanitizer & Parser Agent", msg: "Pulizia tag markdown ed eliminazione di caratteri speciali non validi." },
+        { agent: "JSON Sanitizer & Parser Agent", msg: "Verifica della validità sintattica. JSON Parse completato (0 errori)." },
+        { agent: "Validation & Enrichment Agent", msg: "Controllo dei vincoli dello schema. Tutti i campi obbligatori presenti." },
+        { agent: "Validation & Enrichment Agent", msg: "Verifica e allineamento dei target price analisti e dei livelli di supporto/resistenza." },
+        { agent: "Controller & Orchestrator Agent", msg: `Analisi conclusa con successo per ${target}. Aggiornamento dell'interfaccia utente.` }
+      ];
 
-    let currentLine = 0;
-    const interval = setInterval(() => {
-      if (currentLine < agenticPipelineLogs.length) {
-        const logEntry = {
-          ...agenticPipelineLogs[currentLine],
+      let currentLine = 0;
+      const interval = setInterval(() => {
+        if (currentLine < agenticPipelineLogs.length) {
+          const logEntry = {
+            ...agenticPipelineLogs[currentLine],
+            time: new Date().toLocaleTimeString()
+          };
+          setLogs(prev => [...prev, logEntry]);
+          currentLine++;
+        } else {
+          clearInterval(interval);
+          
+          const freshData = generateDynamicTickerData(target);
+          setCustomTickerData(prev => ({ ...prev, [target]: freshData }));
+          
+          setData(freshData);
+          setLoading(false);
+          
+          setTimeout(() => {
+            setActiveTab("dashboard");
+          }, 1200);
+        }
+      }, 200);
+    };
+
+    try {
+      const eventSource = new EventSource(`http://localhost:3001/api/analyze?ticker=${encodeURIComponent(target)}`);
+      
+      let connectionTimeout = setTimeout(() => {
+        console.warn("Backend bridge connection timeout. Falling back to simulation.");
+        eventSource.close();
+        runFallbackSimulation();
+      }, 1500);
+
+      eventSource.onopen = () => {
+        clearTimeout(connectionTimeout);
+        setLogs(prev => [...prev, {
+          agent: 'System',
+          msg: '⚡ Connesso al server bridge locale (porta 3001). Ricezione log in streaming...',
           time: new Date().toLocaleTimeString()
-        };
-        setLogs(prev => [...prev, logEntry]);
-        currentLine++;
-      } else {
-        clearInterval(interval);
-        
-        // Re-generate custom dynamic data to simulate updated analysis
-        const targetData = generateDynamicTickerData(target);
-        setCustomTickerData(prev => ({ ...prev, [target]: targetData }));
-        
-        setData(targetData);
-        setLoading(false);
-        
-        // Auto switch back to dashboard tab after a small delay
-        setTimeout(() => {
-          setActiveTab("dashboard");
-        }, 1200);
-      }
-    }, 200); // 200ms delay, ~3.2 seconds total
+        }]);
+      };
+
+      eventSource.onmessage = (event) => {
+        try {
+          const eventData = JSON.parse(event.data);
+          
+          if (eventData.type === 'log') {
+            setLogs(prev => [...prev, {
+              agent: eventData.agent,
+              msg: eventData.msg,
+              time: new Date().toLocaleTimeString()
+            }]);
+          } else if (eventData.type === 'data') {
+            const realData = eventData.data;
+            setCustomTickerData(prev => ({ ...prev, [target]: realData }));
+            setData(realData);
+            eventSource.close();
+            setLoading(false);
+            setLogs(prev => [...prev, {
+              agent: 'System',
+              msg: '✅ Analisi reale completata con successo!',
+              time: new Date().toLocaleTimeString()
+            }]);
+            setTimeout(() => {
+              setActiveTab("dashboard");
+            }, 1200);
+          } else if (eventData.type === 'error') {
+            setLogs(prev => [...prev, {
+              agent: 'System',
+              msg: `❌ Errore dal server: ${eventData.msg}. Carico fallback simulato.`,
+              time: new Date().toLocaleTimeString()
+            }]);
+            eventSource.close();
+            setLoading(false);
+            runFallbackSimulation();
+          }
+        } catch (e) {
+          console.error("Error processing message:", e);
+        }
+      };
+
+      eventSource.onerror = (err) => {
+        clearTimeout(connectionTimeout);
+        eventSource.close();
+        runFallbackSimulation();
+      };
+
+    } catch (e) {
+      console.warn("Error initializing EventSource:", e);
+      runFallbackSimulation();
+    }
   };
 
   const runAllAnalyses = () => {
