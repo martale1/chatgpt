@@ -905,20 +905,9 @@ function NewsCard({ news, expanded, onToggle, getSentimentBadge, getImpactDot })
         </div>
       </div>
 
-      <div className="news-summary">{news.summary}</div>
-
-      {news.detail && (
-        <>
-          {expanded && (
-            <div className="news-detail">
-              {news.detail}
-            </div>
-          )}
-          <button className="news-expand-btn" onClick={onToggle}>
-            {expanded ? '▲ Mostra meno' : '▼ Leggi analisi completa'}
-          </button>
-        </>
-      )}
+      <div className="news-summary" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', marginTop: '0.8rem' }}>
+        {news.detail || news.summary}
+      </div>
     </div>
   );
 }

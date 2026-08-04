@@ -95,7 +95,7 @@ function parseReport(text, ticker, company) {
         const date = headlineMatch[1].trim();
         const headline = headlineMatch[2].trim();
         
-        const sintesiMatch = block.match(/\*\s*Sintesi:\s*(.*?)(?:\n|$)/i);
+        const sintesiMatch = block.match(/\*\s*Sintesi:\s*([^]*?)(?=\n\s*\*|\n-\s*\[|$)/i);
         const sentimentMatchNews = block.match(/\*\s*Sentiment:\s*(.*?)(?:\n|$)/i);
         const impattoMatch = block.match(/\*\s*Impatto:\s*(.*?)(?:\n|$)/i);
         const linkMatch = block.match(/\*\s*Link Fonte:\s*(.*?)(?:\n|$)/i);
