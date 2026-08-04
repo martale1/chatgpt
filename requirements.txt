@@ -1,4 +1,9 @@
 beautifulsoup4
+matplotlib
+numpy
+openai-agents
+pandas
 playwright
 requests
 telepot
+yfinance

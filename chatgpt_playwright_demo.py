@@ -17,10 +17,12 @@ TELEGRAM_TOKEN_FALLBACK_ENV = "TELEGRAM_BOT_TOKEN_CH1"
 TELEGRAM_RECEIVER_ENV = "TELEGRAM_RECEIVER_ID"
 DEFAULT_CDP_URL = "http://127.0.0.1:9222"
 SEND_TELEGRAM_BY_DEFAULT = True
+RESPONSE_TIMEOUT_SECONDS = 120
+PAUSE_BETWEEN_STOCKS_SECONDS = 3
 DEFAULT_COMPANY = "Vodafone"
 DEFAULT_TICKER = "VOD.L"
 DEFAULT_MARKET = "London Stock Exchange"
-DEFAULT_STOCKS = ["VOD.L"]
+DEFAULT_STOCKS = ["VOD.L"]#,"NEXI.MI","AVIO.MI","A2A.MI"]
 STOCK_CATALOG = {
     "VOD.L": {"company": "Vodafone", "market": "London Stock Exchange"},
     "A2A.MI": {"company": "A2A", "market": "Borsa Italiana"},
@@ -169,10 +171,10 @@ def send_prompt(page, prompt):
     return initial_assistant_count
 
 
-def wait_for_response(page, initial_assistant_count=0):
+def wait_for_response(page, initial_assistant_count=0, timeout_seconds=RESPONSE_TIMEOUT_SECONDS):
     last_text = ""
     stable_reads = 0
-    deadline_ms = 180000
+    deadline_ms = timeout_seconds * 1000
     step_ms = 2000
     elapsed_ms = 0
 
@@ -203,6 +205,7 @@ def wait_for_response(page, initial_assistant_count=0):
         if last_text and stable_reads >= 2:
             return last_text
 
+    safe_print(f"Timeout risposta dopo {timeout_seconds}s.")
     return last_text
 
 
@@ -225,6 +228,28 @@ def run_in_page(page, prompt, login_only):
     safe_print("\n--- Risposta ChatGPT ---")
     safe_print(response or "Nessuna risposta trovata.")
     return response
+
+
+def run_stock_report(context, stock, index=1, total=1):
+    safe_print(f"\n=== Analisi {index}/{total}: {stock['company']} ({stock['ticker']}) ===")
+    prompt = build_stock_prompt(stock["company"], stock["ticker"], stock["market"])
+    page = open_chatgpt_page(context)
+    try:
+        return run_in_page(page, prompt, False)
+    except Exception as exc:
+        safe_print(f"Errore analisi {stock['ticker']}: {exc}")
+        return ""
+    finally:
+        try:
+            page.close()
+        except PlaywrightError:
+            pass
+
+
+def pause_between_reports(context):
+    pages = context.pages
+    if pages:
+        pages[-1].wait_for_timeout(PAUSE_BETWEEN_STOCKS_SECONDS * 1000)
 
 
 def send_telegram_message(text_message):
@@ -292,8 +317,13 @@ def main():
         action="store_true",
         help="Invia la risposta raccolta su Telegram usando TELEGRAM_BOT_TOKEN e TELEGRAM_RECEIVER_ID da .env.",
     )
+    parser.add_argument(
+        "--no-telegram",
+        action="store_true",
+        help="Disattiva l'invio Telegram anche se SEND_TELEGRAM_BY_DEFAULT e True.",
+    )
     args = parser.parse_args()
-    send_to_telegram = args.telegram or SEND_TELEGRAM_BY_DEFAULT
+    send_to_telegram = False if args.no_telegram else (args.telegram or SEND_TELEGRAM_BY_DEFAULT)
     stocks = parse_stock_list(args.stocks)
 
     with sync_playwright() as p:
@@ -309,12 +339,10 @@ def main():
             else:
                 for index, ticker in enumerate(stocks, start=1):
                     stock = stock_from_ticker(ticker)
-                    safe_print(f"\n=== Analisi {index}/{len(stocks)}: {stock['company']} ({stock['ticker']}) ===")
-                    prompt = build_stock_prompt(stock["company"], stock["ticker"], stock["market"])
-                    page = open_chatgpt_page(context)
-                    response = run_in_page(page, prompt, args.login_only)
+                    response = run_stock_report(context, stock, index, len(stocks))
                     if send_to_telegram and response:
                         send_telegram_message(response)
+                    pause_between_reports(context)
             return
 
         launch_options = {
@@ -335,12 +363,10 @@ def main():
         else:
             for index, ticker in enumerate(stocks, start=1):
                 stock = stock_from_ticker(ticker)
-                safe_print(f"\n=== Analisi {index}/{len(stocks)}: {stock['company']} ({stock['ticker']}) ===")
-                prompt = build_stock_prompt(stock["company"], stock["ticker"], stock["market"])
-                page = open_chatgpt_page(context)
-                response = run_in_page(page, prompt, args.login_only)
+                response = run_stock_report(context, stock, index, len(stocks))
                 if send_to_telegram and response:
                     send_telegram_message(response)
+                pause_between_reports(context)
         context.close()
 
 
