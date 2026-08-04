@@ -230,7 +230,7 @@ const server = http.createServer((req, res) => {
 
     res.write(`data: ${JSON.stringify({ type: 'log', agent: 'Playwright Scraper Agent', msg: `Eseguo: python3 chatgpt_playwright_demo.py --ticker ${ticker} --company "${info.company}"` })}\n\n`);
 
-    const scraperProcess = spawn(PYTHON_PATH, args);
+    const scraperProcess = spawn(`"${PYTHON_PATH}"`, args, { shell: true });
 
     let scraperOutput = '';
 
