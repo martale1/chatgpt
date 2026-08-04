@@ -1105,8 +1105,19 @@ export default function App() {
             <div className="card card-summary">
               <div className="card-title">
                 📋 Sintesi &amp; Sentiment — {data.search_metadata.company_name}
-                <span style={{ marginLeft: '0.5rem' }}>({data.search_metadata.ticker})</span>
-                <span style={{ marginLeft: '0.7rem' }}>{getSentimentBadge(ms?.overall_sentiment)}</span>
+                <span style={{ marginLeft: '0.2rem', color: '#94a3b8', fontWeight: '500' }}>({data.search_metadata.ticker})</span>
+                <span style={{ marginLeft: '0.5rem' }}>{getSentimentBadge(ms?.overall_sentiment)}</span>
+                {data.search_metadata.timestamp_utc && (
+                  <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#94a3b8', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    📅 Analisi del: {new Date(data.search_metadata.timestamp_utc).toLocaleString('it-IT', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </span>
+                )}
               </div>
 
               <div className="summary-grid">
@@ -1133,6 +1144,17 @@ export default function App() {
                   </ul>
                   <div className="news-count-badge">
                     📰 {allNews.length} notizie analizzate &nbsp;|&nbsp; 🏛️ {data.search_metadata.market}
+                    {data.search_metadata.timestamp_utc && (
+                      <>
+                        &nbsp;|&nbsp; 📅 Aggiornato: {new Date(data.search_metadata.timestamp_utc).toLocaleString('it-IT', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
