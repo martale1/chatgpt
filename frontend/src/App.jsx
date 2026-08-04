@@ -878,15 +878,31 @@ function NewsCard({ news, expanded, onToggle, getSentimentBadge, getImpactDot })
         {news.source_domain && (
           <span className="news-source-domain">via {news.source_domain}</span>
         )}
-        <a
-          href={news.url || `https://www.google.com/search?q=${encodeURIComponent(news.headline + ' ' + news.source)}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="news-source-link"
-          title={news.url ? "Apri l'articolo originale" : "Cerca questa notizia su Google"}
-        >
-          🔗 Apri Fonte {news.url ? "" : "(Ricerca)"}
-        </a>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+          {(news.url || news.source_domain) && (
+            <a
+              href={news.url || `https://${news.source_domain}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="news-source-link"
+              title={news.url ? "Apri l'articolo originale" : `Visita la home page di ${news.source_domain}`}
+            >
+              🌐 {news.url ? "Apri Articolo" : "Visita Sito"}
+            </a>
+          )}
+          {!news.url && (
+            <a
+              href={`https://www.google.com/search?q=${encodeURIComponent(news.headline + ' ' + news.source)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="news-source-link"
+              title="Cerca questa notizia su Google"
+              style={{ color: '#94a3b8' }}
+            >
+              🔍 Cerca Notizia
+            </a>
+          )}
+        </div>
       </div>
 
       <div className="news-summary">{news.summary}</div>
