@@ -815,8 +815,31 @@ export default function App() {
     const target = (searchTerm || query).trim().toUpperCase();
     if (!target) return;
     
-    setLoading(true);
     setQuery(target);
+    
+    // Load data instantly
+    let targetData = MOCK_DB[target] || GENERATED_TICKER_DATA[target] || customTickerData[target];
+    if (!targetData) {
+      targetData = generateDynamicTickerData(target);
+      setCustomTickerData(prev => ({ ...prev, [target]: targetData }));
+    }
+    
+    // Add to watchlist if not present
+    setWatchlist(prev => {
+      if (!prev.includes(target)) {
+        return [...prev, target];
+      }
+      return prev;
+    });
+    
+    setData(targetData);
+    setActiveTab("dashboard");
+  };
+
+  const runAgentAnalysis = (target) => {
+    if (!target) return;
+    
+    setLoading(true);
     setLogs([]);
     setActiveTab("logs");
 
@@ -851,20 +874,9 @@ export default function App() {
       } else {
         clearInterval(interval);
         
-        // Load data
-        let targetData = MOCK_DB[target] || GENERATED_TICKER_DATA[target] || customTickerData[target];
-        if (!targetData) {
-          targetData = generateDynamicTickerData(target);
-          setCustomTickerData(prev => ({ ...prev, [target]: targetData }));
-        }
-        
-        // Add to watchlist if not present
-        setWatchlist(prev => {
-          if (!prev.includes(target)) {
-            return [...prev, target];
-          }
-          return prev;
-        });
+        // Re-generate custom dynamic data to simulate updated analysis
+        const targetData = generateDynamicTickerData(target);
+        setCustomTickerData(prev => ({ ...prev, [target]: targetData }));
         
         setData(targetData);
         setLoading(false);
@@ -875,6 +887,65 @@ export default function App() {
         }, 1200);
       }
     }, 200); // 200ms delay, ~3.2 seconds total
+  };
+
+  const runAllAnalyses = () => {
+    if (watchlist.length === 0) return;
+    
+    setLoading(true);
+    setLogs([]);
+    setActiveTab("logs");
+    
+    let currentTickerIndex = 0;
+    
+    const runNext = () => {
+      if (currentTickerIndex < watchlist.length) {
+        const t = watchlist[currentTickerIndex];
+        const logMsg = {
+          agent: "Controller & Orchestrator Agent",
+          msg: `🚀 Avvio analisi sequenziale [${currentTickerIndex + 1}/${watchlist.length}] per: ${t}`,
+          time: new Date().toLocaleTimeString()
+        };
+        setLogs(prev => [...prev, logMsg]);
+        
+        setTimeout(() => {
+          const logMsg2 = {
+            agent: "Playwright Scraper Agent",
+            msg: `Connessione CDP & Scrape concluso con successo per ${t}`,
+            time: new Date().toLocaleTimeString()
+          };
+          setLogs(prev => [...prev, logMsg2]);
+          
+          // Generate/Update data
+          const targetData = generateDynamicTickerData(t);
+          setCustomTickerData(prev => ({ ...prev, [t]: targetData }));
+          
+          currentTickerIndex++;
+          setTimeout(runNext, 400);
+        }, 600);
+      } else {
+        const logMsgDone = {
+          agent: "Controller & Orchestrator Agent",
+          msg: `✅ Analisi completata con successo per tutti i ${watchlist.length} titoli in Watchlist!`,
+          time: new Date().toLocaleTimeString()
+        };
+        setLogs(prev => [...prev, logMsgDone]);
+        setLoading(false);
+        
+        // Select first ticker
+        const first = watchlist[0];
+        if (first) {
+          setData(MOCK_DB[first] || GENERATED_TICKER_DATA[first] || customTickerData[first]);
+          setQuery(first);
+        }
+        
+        setTimeout(() => {
+          setActiveTab("dashboard");
+        }, 1500);
+      }
+    };
+    
+    runNext();
   };
 
 
@@ -1005,9 +1076,33 @@ export default function App() {
 
       {/* ── WATCHLIST OVERVIEW TABLE ── */}
       <div className="watchlist-card">
-        <div className="watchlist-header">
-          <span className="watchlist-title">📊 Watchlist — Sentiment Overview</span>
-          <span className="watchlist-sub">{watchlist.length} titoli monitorati · Clicca per analizzare</span>
+        <div className="watchlist-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div>
+            <span className="watchlist-title">📊 Watchlist — Sentiment Overview</span>
+            <span className="watchlist-sub">{watchlist.length} titoli monitorati · Clicca su un titolo per vederlo subito</span>
+          </div>
+          <button 
+            className="btn-trigger-all" 
+            onClick={runAllAnalyses} 
+            disabled={loading || watchlist.length === 0}
+            style={{
+              padding: '0.4rem 0.8rem',
+              fontSize: '0.8rem',
+              background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+              border: 'none',
+              color: '#ffffff',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.3rem',
+              fontWeight: '600',
+              transition: 'opacity 0.2s'
+            }}
+            title="Esegui l'analisi sequenziale simulata per tutti i titoli in Watchlist"
+          >
+            ⚡ Esegui Analisi Completa (Tutti)
+          </button>
         </div>
         <div className="watchlist-table">
           <div className="wt-thead">
@@ -1120,6 +1215,30 @@ export default function App() {
                 📋 Sintesi &amp; Sentiment — {data.search_metadata.company_name}
                 <span style={{ marginLeft: '0.2rem', color: '#94a3b8', fontWeight: '500' }}>({data.search_metadata.ticker})</span>
                 <span style={{ marginLeft: '0.5rem' }}>{getSentimentBadge(ms?.overall_sentiment)}</span>
+                
+                <button 
+                  onClick={() => runAgentAnalysis(data.search_metadata.ticker)}
+                  style={{
+                    marginLeft: '1rem',
+                    background: 'rgba(56, 189, 248, 0.1)',
+                    border: '1px solid rgba(56, 189, 248, 0.3)',
+                    color: '#38bdf8',
+                    padding: '0.25rem 0.6rem',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    fontWeight: '600',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="btn-trigger-analysis"
+                  title="Avvia l'analisi agentica con Playwright su questo titolo"
+                >
+                  🔄 Avvia Analisi Live
+                </button>
+
                 {data.search_metadata.timestamp_utc && (
                   <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#94a3b8', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                     📅 Analisi del: {new Date(data.search_metadata.timestamp_utc).toLocaleString('it-IT', {

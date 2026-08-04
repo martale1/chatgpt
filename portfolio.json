@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "created_at": "2026-07-23T20:25:47",
+  "updated_at": "2026-07-23T20:34:33",
+  "base_currency": "EUR",
+  "initial_capital": 10000.0,
+  "cash": 10000.0,
+  "positions": [],
+  "watchlist": [],
+  "pending_proposals": [
+    {
+      "id": "20260723-203433",
+      "created_at": "2026-07-23T20:34:33",
+      "status": "pending",
+      "action": "create_virtual_allocation",
+      "ticker": "PORTFOLIO",
+      "reason": "Allocazione virtuale proposta da scanner MIB30: 3 titoli, 85.0% investito e 15.0% cash.",
+      "metadata": {
+        "capital": 10000.0,
+        "allocations": [
+          {
+            "ticker": "CPR.MI",
+            "name": "Campari",
+            "market": "Borsa Italiana",
+            "sector": "Consumer Defensive",
+            "score": 9,
+            "allocation_pct": 29.42,
+            "allocated_amount": 2942.31,
+            "entry_price": 5.516,
+            "virtual_quantity": 533.4137,
+            "reason": "MACD sopra signal; DI+ sopra DI- con ADX >= 20; RSI costruttivo non eccessivo; volume sopra MA10; resistenza breve vicina; supporto breve vicino",
+            "risks": []
+          },
+          {
+            "ticker": "HER.MI",
+            "name": "Hera",
+            "market": "Borsa Italiana",
+            "sector": "Utilities",
+            "score": 9,
+            "allocation_pct": 29.42,
+            "allocated_amount": 2942.31,
+            "entry_price": 3.884,
+            "virtual_quantity": 757.5463,
+            "reason": "MACD sopra signal; DI+ sopra DI- con ADX >= 20; RSI costruttivo non eccessivo; volume sopra MA10; resistenza breve vicina; supporto breve vicino",
+            "risks": []
+          },
+          {
+            "ticker": "AMP.MI",
+            "name": "Amplifon",
+            "market": "Borsa Italiana",
+            "sector": "Healthcare",
+            "score": 8,
+            "allocation_pct": 26.15,
+            "allocated_amount": 2615.38,
+            "entry_price": 10.935,
+            "virtual_quantity": 239.1751,
+            "reason": "MACD sopra signal; DI+ sopra DI- con ADX >= 20; RSI costruttivo non eccessivo; volume sopra MA10; resistenza breve vicina",
+            "risks": []
+          }
+        ],
+        "cash_pct": 15.0,
+        "cash_amount": 1500.0,
+        "scan_file": "C:\\Users\\theoi\\PycharmProjects\\webscraping\\output\\stock_ai\\mib30_scan.json",
+        "errors": [
+          {
+            "ticker": "BPSO.MI",
+            "error": "No market data found for BPSO.MI"
+          }
+        ]
+      }
+    }
+  ],
+  "closed_proposals": []
+}
