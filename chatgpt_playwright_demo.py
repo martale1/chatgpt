@@ -320,33 +320,40 @@ def main():
     stocks = parse_stock_list(args.stocks)
 
     with sync_playwright() as p:
+        context = None
+        use_cdp = False
+        
         if args.cdp:
-            browser = p.chromium.connect_over_cdp(args.cdp)
-            context = browser.contexts[0] if browser.contexts else browser.new_context()
-            if args.prompt or args.login_only:
-                prompt = args.prompt or build_stock_prompt(args.company, args.ticker, args.market)
-                page = open_chatgpt_page(context)
-                response = run_in_page(page, prompt, args.login_only)
-                if send_to_telegram and response:
-                    send_telegram_message(response)
-            else:
-                for index, ticker in enumerate(stocks, start=1):
-                    stock = stock_from_ticker(ticker)
-                    response = run_stock_report(context, stock, index, len(stocks))
-                    if send_to_telegram and response:
-                        send_telegram_message(response)
-                    pause_between_reports(context)
-            return
+            try:
+                safe_print(f"Tentativo di connessione a Chrome via CDP ({args.cdp})...")
+                browser = p.chromium.connect_over_cdp(args.cdp)
+                context = browser.contexts[0] if browser.contexts else browser.new_context()
+                use_cdp = True
+                safe_print("Connessione CDP stabilita con successo!")
+            except Exception as exc:
+                safe_print(f"Impossibile connettersi via CDP ({exc}).")
+                safe_print("Avvio una nuova istanza visibile di Google Chrome reale...")
 
-        launch_options = {
-            "user_data_dir": str(CHROME_PROFILE_DIR if args.chrome else PROFILE_DIR),
-            "headless": False,
-            "viewport": {"width": 1400, "height": 900},
-        }
-        if args.chrome:
+        if not use_cdp:
+            launch_options = {
+                "user_data_dir": str(CHROME_PROFILE_DIR if args.chrome else PROFILE_DIR),
+                "headless": False,
+                "viewport": {"width": 1400, "height": 900},
+            }
+            # Utilizza il canale Chrome reale se disponibile
             launch_options["channel"] = "chrome"
+            try:
+                context = p.chromium.launch_persistent_context(**launch_options)
+            except Exception as e:
+                safe_print(f"Errore lancio Chrome reale ({e}). Provo Chromium standard...")
+                if "channel" in launch_options:
+                    del launch_options["channel"]
+                try:
+                    context = p.chromium.launch_persistent_context(**launch_options)
+                except Exception as e2:
+                    safe_print(f"Impossibile avviare il browser: {e2}")
+                    return
 
-        context = p.chromium.launch_persistent_context(**launch_options)
         if args.prompt or args.login_only:
             prompt = args.prompt or build_stock_prompt(args.company, args.ticker, args.market)
             page = open_chatgpt_page(context)
@@ -360,7 +367,9 @@ def main():
                 if send_to_telegram and response:
                     send_telegram_message(response)
                 pause_between_reports(context)
-        context.close()
+                
+        if not use_cdp and context:
+            context.close()
 
 
 if __name__ == "__main__":
