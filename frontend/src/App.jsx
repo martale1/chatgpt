@@ -1092,10 +1092,6 @@ export default function App() {
           
           setData(freshData);
           setLoading(false);
-          
-          setTimeout(() => {
-            setActiveTab("dashboard");
-          }, 1200);
         }
       }, 200);
     };
@@ -1136,12 +1132,9 @@ export default function App() {
             setLoading(false);
             setLogs(prev => [...prev, {
               agent: 'System',
-              msg: '✅ Analisi reale completata con successo!',
+              msg: '✅ Analisi reale completata con successo! Puoi passare alla Dashboard per vedere i dati aggiornati.',
               time: new Date().toLocaleTimeString()
             }]);
-            setTimeout(() => {
-              setActiveTab("dashboard");
-            }, 1200);
           } else if (eventData.type === 'error') {
             setLogs(prev => [...prev, {
               agent: 'System',
@@ -1218,10 +1211,6 @@ export default function App() {
           setData(MOCK_DB[first] || GENERATED_TICKER_DATA[first] || customTickerData[first]);
           setQuery(first);
         }
-        
-        setTimeout(() => {
-          setActiveTab("dashboard");
-        }, 1500);
       }
     };
     
