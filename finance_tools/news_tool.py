@@ -28,7 +28,7 @@ def _extract_response(stdout):
     return stdout.split(marker, 1)[1].strip()
 
 
-def get_news_report(ticker, live=False):
+def get_news_report(ticker, live=True):
     info = ticker_info(ticker)
     output_path = PROJECT_ROOT / "output" / "stock_ai" / info["ticker"].replace("/", "_") / f"{info['ticker']}_news.txt"
     print(f"[news-tool] {info['ticker']} - richiesta news | live={live}", flush=True)

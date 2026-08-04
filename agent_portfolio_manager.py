@@ -39,7 +39,7 @@ def analyze_stock_chart(ticker: str, days: int = 70, period: str = "1y") -> str:
 
 
 @function_tool
-def analyze_stock_news(ticker: str, live: bool = False) -> str:
+def analyze_stock_news(ticker: str, live: bool = True) -> str:
     """Return a news report for one stock.
 
     Args:
