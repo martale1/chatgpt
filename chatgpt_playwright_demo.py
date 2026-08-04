@@ -64,7 +64,7 @@ def build_stock_prompt(company, ticker="", market=""):
 
 📰 News rilevanti:
 - [Data Notizia] [Titolo Notizia]
-  * Sintesi: [Riassunto della notizia, da 1 a massimo 5 righe]
+  * Testo Completo: [Riporta l'intero testo esteso ed esplicativo della notizia senza riassumerlo, includendo tutti i dettagli operativi, numeri, percentuali e dichiarazioni]
   * Sentiment: [Positivo / Neutro / Negativo]
   * Impatto: [Alto / Medio / Basso]
   * Link Fonte: [URL dell'articolo originale, se trovato, altrimenti scrivere "non disponibile"]
@@ -78,17 +78,17 @@ Se non trovi aggiornamenti recenti, scrivi: Nessun aggiornamento recente sui tar
 - Resistenze: R1: [valuta e livello], R2: [valuta e livello]
 
 🧭 Sintesi del Sentiment generale:
-[max 5 righe che riassumono il sentiment complessivo emerso dalle notizie e l'impatto atteso sul titolo]
+[Analisi approfondita ed estesa sul sentiment complessivo emerso dalle notizie e l'impatto atteso sul titolo]
 
 🔗 Fonti consultate (fino a 5 fonti, con URL se disponibile):
 - [Nome Fonte 1] - [URL link]
 - [Nome Fonte 2] - [URL link]
 
 Regole operative:
+- NON RIASSUMERE LE NOTIZIE: fornisci il testo esteso e dettagliato esattamente come estratto dalla fonte.
 - Non inventare dati o URL. Se un dato o un link non è disponibile, scrivi "non disponibile".
 - Fornisci solo notizie reali pubblicate da testate giornalistiche o comunicati stampa ufficiali.
-- Se trovi livelli tecnici o target price, specifica sempre la valuta di riferimento (es. EUR, USD, GBp).
-- Mantieni il formato pulito e compatto."""
+- Se trovi livelli tecnici o target price, specifica sempre la valuta di riferimento (es. EUR, USD, GBp)."""
 
 
 DEFAULT_PROMPT = build_stock_prompt(DEFAULT_COMPANY, DEFAULT_TICKER, DEFAULT_MARKET)

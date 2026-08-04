@@ -674,8 +674,8 @@ const generateDynamicTickerData = (ticker) => {
       news1: {
         headline: `${companyName} firma un accordo di joint venture per l'espansione nel mercato asiatico`,
         category: "Corporate / Expansion",
-        summary: `La partnership strategica mira a raddoppiare la quota di mercato nell'area Asia-Pacifico entro i prossimi tre anni.`,
-        detail: `L'intesa prevede la costituzione di una nuova entità legale controllata congiuntamente, focalizzata sulla distribuzione locale dei prodotti e dei servizi core del gruppo. Gli investimenti iniziali saranno finanziati tramite liquidità esistente.`,
+        summary: `La partnership strategica mira a raddoppiare la quota di mercato nell'area Asia-Pacifico entro i prossimi tre anni attraverso una struttura societaria paritetica ed investimenti mirati in infrastrutture commerciali locali.`,
+        detail: `L'intesa strategica firmata dal management prevede la costituzione di una nuova entità legale controllata congiuntamente, focalizzata sulla distribuzione capillare dei prodotti e dei servizi core del gruppo nelle principali aree metropolitane dell'Asia-Pacifico. Gli investimenti iniziali ammontano a circa €120 milioni e saranno finanziati interamente tramite la liquidità operativa disponibile a bilancio, senza ricorrere ad emissioni di debito o aumenti di capitale. L'operazione ha ottenuto il parere favorevole delle autorità regolatorie locali e si stima possa generare ricavi incrementali per €45 milioni già nel primo anno di piena operatività.`,
         sentiment: "Positivo",
         impact_rating: "Alto",
         source: isItalian ? "Il Sole 24 Ore" : "CNBC",
@@ -684,8 +684,8 @@ const generateDynamicTickerData = (ticker) => {
       news2: {
         headline: `${companyName} presenta la nuova gamma di prodotti basati sull'intelligenza artificiale`,
         category: "Technology / R&D",
-        summary: `Il lancio sul mercato globale è pianificato per l'inizio del prossimo mese, con ordini preliminari già record.`,
-        detail: `I nuovi dispositivi ed applicazioni integrano funzionalità AI avanzate per ottimizzare i flussi di lavoro degli utenti business. Gli analisti prevedono un contributo positivo ai margini a partire dal prossimo anno fiscale.`,
+        summary: `La nuova architettura software ed hardware integra algoritmi proprietari avanzati per ottimizzare le prestazioni enterprise ed abbattere i consumi energetici fino al 35%.`,
+        detail: `${companyName} ha presentato ufficialmente la nuova piattaforma tecnologica di prossima generazione pensata per i data center enterprise ed il calcolo ad elevate prestazioni. I nuovi dispositivi ed applicazioni integrano funzionalità AI avanzate per ottimizzare l'efficienza energetica del 35% e ridurre i tempi di elaborazione nei carichi di lavoro complessi. Gli analisti delle principali banche d'affari prevedono un incremento significativo dei margini lordi a partire dal prossimo anno fiscale, sostenuto da un volume di preordini da parte dei clienti business che ha già saturato la capacità produttiva del primo trimestre.`,
         sentiment: "Positivo",
         impact_rating: "Medio",
         source: "TechCrunch / Reuters",
