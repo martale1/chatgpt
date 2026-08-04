@@ -3,7 +3,10 @@ import os
 import sys
 from pathlib import Path
 
-import telepot
+try:
+    import telepot
+except ImportError:
+    telepot = None
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import sync_playwright
@@ -246,6 +249,9 @@ def pause_between_reports(context):
 
 
 def send_telegram_message(text_message):
+    if telepot is None:
+        safe_print("\nTelegram non inviato: modulo telepot non installato.")
+        return
     token = os.getenv(TELEGRAM_TOKEN_ENV) or os.getenv(TELEGRAM_TOKEN_FALLBACK_ENV)
     receiver_id = os.getenv(TELEGRAM_RECEIVER_ENV)
     if not token or not receiver_id:
