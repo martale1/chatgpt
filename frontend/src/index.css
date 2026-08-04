@@ -396,7 +396,24 @@ header p { color: var(--text-muted); }
   font-style: italic;
 }
 
-/* Testo dettaglio espanso */
+.news-source-link {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: #38bdf8;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: color 0.15s ease-in-out, opacity 0.15s ease-in-out;
+  font-weight: 500;
+}
+
+.news-source-link:hover {
+  color: #7dd3fc;
+  text-decoration: underline;
+  opacity: 0.95;
+}
+
 .news-detail {
   font-size: 0.9rem;
   color: #e2e8f0;
