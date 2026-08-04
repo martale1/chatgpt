@@ -221,8 +221,8 @@ def run_in_page(page, prompt, login_only):
         input("Fai login nel browser aperto, poi premi INVIO qui per chiudere...")
         return
 
-    safe_print("Prompt da inviare:")
-    safe_print(prompt.encode("ascii", errors="ignore").decode("ascii")[:500])
+    safe_print("\n--- Domanda ChatGPT ---")
+    safe_print(prompt)
     initial_assistant_count = send_prompt(page, prompt)
     response = wait_for_response(page, initial_assistant_count)
     safe_print("\n--- Risposta ChatGPT ---")
