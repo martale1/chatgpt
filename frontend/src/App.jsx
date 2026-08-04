@@ -839,6 +839,45 @@ export default function App() {
   const runAgentAnalysis = (target) => {
     if (!target) return;
     
+    let targetData = MOCK_DB[target] || GENERATED_TICKER_DATA[target] || customTickerData[target];
+    if (!targetData) {
+      targetData = generateDynamicTickerData(target);
+    }
+
+    const companyName = targetData.search_metadata.company_name;
+    const marketName = targetData.search_metadata.market;
+
+    const simulatedPrompt = `Cerca news di oggi su ${companyName} (${target}) - ${marketName}. Rispondi in italiano e usa esattamente questo formato:
+    
+📌 ${companyName.toUpperCase()} / ${target} - REPORT GIORNALIERO
+
+🗓 Data:
+[oggi]
+
+📰 News rilevanti:
+- [news 1]
+- [news 2]
+
+🎯 Target price / analisti:
+- [broker/banca]: [target price] - [rating] - [data]
+
+📈 Supporti:
+- S1: [livello]
+- S2: [livello]
+
+📉 Resistenze:
+- R1: [livello]
+- R2: [livello]
+
+🧭 Sintesi operativa:
+[max 5 righe, chiara e prudente]
+
+🔗 Fonti:
+- [fonte 1]
+- [fonte 2]`;
+
+    const simulatedResponse = JSON.stringify(targetData, null, 2);
+
     setLoading(true);
     setLogs([]);
     setActiveTab("logs");
@@ -846,14 +885,20 @@ export default function App() {
     const agenticPipelineLogs = [
       { agent: "Controller & Orchestrator Agent", msg: `Ricevuta richiesta di analisi per il ticker: ${target}` },
       { agent: "Prompt Engineering Agent", msg: "Risoluzione del nome aziendale e arricchimento del prompt..." },
-      { agent: "Prompt Engineering Agent", msg: `Costruzione del prompt strutturato JSON ottimizzato per ${target}.` },
+      { 
+        agent: "Prompt Engineering Agent", 
+        msg: `Costruzione del prompt strutturato ottimizzato per ${target}:\n\n==================================================\nDOMANDA INVIATA A CHATGPT:\n--------------------------------------------------\n${simulatedPrompt}\n==================================================` 
+      },
       { agent: "Playwright Scraper Agent", msg: "Inizializzazione browser Chromium via Playwright..." },
       { agent: "Playwright Scraper Agent", msg: "Connessione alla sessione Google Chrome attiva (remote-debugging-port: 9222)..." },
       { agent: "Playwright Scraper Agent", msg: "Connessione stabilita con successo su CDP. Apertura chatgpt.com..." },
       { agent: "Playwright Scraper Agent", msg: "Rilevato campo di input prompt-textarea. Inserimento prompt strutturato." },
       { agent: "Playwright Scraper Agent", msg: "Invio prompt a ChatGPT in corso... Monitoraggio risposte." },
       { agent: "Playwright Scraper Agent", msg: "Rilevato streaming di risposta da parte dell'assistente ChatGPT..." },
-      { agent: "Playwright Scraper Agent", msg: "Generazione conclusa con successo. Raccolta del payload della risposta." },
+      { 
+        agent: "Playwright Scraper Agent", 
+        msg: `Generazione conclusa con successo. Payload della risposta ricevuta:\n\n==================================================\nRISPOSTA RICEVUTA DA CHATGPT (RAW JSON):\n--------------------------------------------------\n${simulatedResponse}\n==================================================` 
+      },
       { agent: "JSON Sanitizer & Parser Agent", msg: "Estrazione del blocco JSON. Rilevato blocco di codice markdown." },
       { agent: "JSON Sanitizer & Parser Agent", msg: "Pulizia tag markdown ed eliminazione di caratteri speciali non validi." },
       { agent: "JSON Sanitizer & Parser Agent", msg: "Verifica della validità sintattica. JSON Parse completato (0 errori)." },
