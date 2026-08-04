@@ -1,264 +1,64 @@
-# meteoAgent
+# Multi-Agent Financial News Analyzer (Playwright + ChatGPT + React)
 
-Automazioni Python per scraping e notifiche Telegram.
+Sistema **Multi-Agent** per l'estrazione, classificazione e sentiment analysis di notizie finanziarie tramite automazione **Playwright** su ChatGPT e dashboard di visualizzazione **React**.
 
-Il repository contiene due scraper separati:
+---
 
-- `ilmeteo_gioiosa.py`: previsioni meteo/mare per Gioiosa Marea da iLMeteo.it.
-- `anyiot_healthcheck.py`: controllo heartbeat dei sensori temperatura/umidita AnyIOT.
+## 🎯 Caratteristiche Principali
 
-I due script sono indipendenti: puoi eseguirli e schedularli separatamente.
+- **Input Flessibile**: Cerca notizie specificando un **Ticker** (es. `AVIO.MI`, `VOD.L`, `AAPL`) oppure il **Nome dell'Azienda** (es. `Avio`, `Vodafone`, `Apple`).
+- **Analisi Strutturata in JSON**:
+  - **Notizie recenti negli ultimi 3 giorni** (incluso oggi).
+  - **Ultime notizie storiche rilevanti disponibili** (se non ci sono news negli ultimi 3 giorni).
+  - **Classificazione della news** (*Financials*, *Contratti*, *M&A*, *Analisti/Rating*, *Macro/Settoriale*, ecc.).
+  - **Sentiment & Impatto sul Titolo** (*Positivo*, *Neutro*, *Negativo* + rating impatto).
+  - **Target Price & Analisti** + **Livelli Tecnici (Supporti e Resistenze)**.
+- **Frontend React**: Dashboard interattiva per lanciare le analisi e visualizzare l'output JSON e le schede riassuntive.
 
-## Scraper 1: Meteo Gioiosa Marea
+---
 
-`ilmeteo_gioiosa.py` legge i 7 giorni disponibili da iLMeteo.it, apre le pagine giornaliere e raccoglie i dati orari.
-
-Funzionalita:
-
-- temperature minime e massime giornaliere
-- onde, vento, raffiche e direzione vento ora per ora
-- umidita e pressione
-- riepilogo Telegram formattato
-- badge onde nel messaggio Telegram:
-  - verde sotto 30 cm
-  - arancione fino a 50 cm
-  - rosso sopra 50 cm
-- link finale alla pagina iLMeteo
-
-File generati:
-
-- `gioiosa_marea_ilmeteo.csv`: riepilogo giornaliero
-- `gioiosa_marea_orario_ilmeteo.csv`: dettaglio orario
-
-Esecuzione:
-
-```bash
-./run_meteo.sh
-```
-
-Oppure direttamente:
-
-```bash
-python ilmeteo_gioiosa.py
-```
-
-Cron suggerito, ogni giorno alle 8:00 e alle 20:00:
-
-```cron
-0 8,20 * * * cd $HOME/meteoAgent && ./run_meteo.sh >> $HOME/meteoAgent/meteo.log 2>&1
-```
-
-## Scraper 2: AnyIOT Healthcheck
-
-`anyiot_healthcheck.py` controlla la pagina:
+## 🛠️ Struttura del Progetto
 
 ```text
-http://theoiziruam.ddns.net:808/index2.php
+├── chatgpt_playwright_demo.py   # Agent Python con Playwright per automazione ChatGPT via CDP
+├── requirements.txt             # Dipendenze Python (playwright, telepot, pandas, ecc.)
+├── .env.example                 # Configurazione variabili d'ambiente (Telegram, ecc.)
+└── frontend/                    # Application Dashboard React (Vite + React)
 ```
 
-Lo script estrae i sensori temperatura/umidita e usa il timestamp dell'ultimo aggiornamento come heartbeat.
+---
 
-Logica di allarme:
+## 🚀 Esecuzione
 
-- al momento vengono monitorati solo i sensori della casa `Cusago`
-- i sensori `Zappardino` / Sicilia sono ignorati per evitare falsi allarmi quando vengono spenti
-- i sensori dovrebbero aggiornare ogni 30 minuti
-- un sensore e considerato non aggiornato dopo 45 minuti
-- Telegram viene avvisato solo in caso di problemi
+### 1. Requisiti e Dipendenze Python
 
-Invia notifica se:
-
-- la pagina AnyIOT non e raggiungibile
-- non viene estratto nessun sensore
-- uno o piu sensori temperatura/umidita non aggiornano da oltre 45 minuti
-- tutti i sensori risultano non aggiornati
-
-Non invia notifica quando tutto e OK.
-
-Esecuzione:
-
-```bash
-./run_anyiot_healthcheck.sh
-```
-
-Oppure direttamente:
-
-```bash
-python anyiot_healthcheck.py
-```
-
-Cron suggerito, ogni 30 minuti:
-
-```cron
-*/30 * * * * cd $HOME/meteoAgent && ./run_anyiot_healthcheck.sh >> $HOME/meteoAgent/anyiot_healthcheck.log 2>&1
-```
-
-## Configurazione Telegram
-
-Copia `.env.example` in `.env`:
-
-```bash
-cp .env.example .env
-```
-
-Inserisci i valori reali:
-
-```env
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-TELEGRAM_RECEIVER_ID=your_telegram_chat_id
-```
-
-Il file `.env` contiene dati sensibili ed e escluso dal repository tramite `.gitignore`.
-
-## Installazione su Raspberry/Linux
-
-```bash
-cd ~
-git clone https://github.com/martale1/meteoAgent.git
-cd meteoAgent
-cp .env.example .env
-nano .env
-chmod +x run_meteo.sh run_anyiot_healthcheck.sh
-```
-
-I launcher creano automaticamente `.venv` e installano le dipendenze da `requirements.txt` se necessario.
-
-Prima esecuzione meteo:
-
-```bash
-./run_meteo.sh
-```
-
-Prima esecuzione healthcheck:
-
-```bash
-./run_anyiot_healthcheck.sh
-```
-
-## Installazione su Windows/Conda
-
-Con ambiente Conda `openaiAgent`:
-
-```powershell
-& "C:\Users\theoi\anaconda3\Scripts\conda.exe" run -n openaiAgent pip install -r requirements.txt
-```
-
-Meteo:
-
-```powershell
-& "C:\Users\theoi\anaconda3\Scripts\conda.exe" run -n openaiAgent python ilmeteo_gioiosa.py
-```
-
-AnyIOT:
-
-```powershell
-& "C:\Users\theoi\anaconda3\Scripts\conda.exe" run -n openaiAgent python anyiot_healthcheck.py
-```
-
-## Script di supporto
-
-- `chatgpt_playwright_demo.py`: demo locale Playwright con profilo persistente per aprire ChatGPT e inviare un prompt
-- `inspect_available_days.py`: verifica i giorni disponibili su iLMeteo
-- `inspect_day_ilmeteo.py`: ispezione della tabella meteo giornaliera
-- `inspect_ilmeteo.py`: ispezione della pagina meteo principale
-- `inspect_mare_ilmeteo.py`: ispezione della pagina mare
-- `inspect_anyiot.py`: ispezione della pagina AnyIOT
-
-## Demo Playwright ChatGPT
-
-Questa demo e pensata per prove locali. Usa un profilo browser persistente in `playwright_chatgpt_profile`, quindi puoi fare login una volta e riusare la sessione.
-
-Installa Playwright e Chromium:
+Assicurati di installare i pacchetti e i browser per Playwright:
 
 ```bash
 pip install -r requirements.txt
 python -m playwright install chromium
 ```
 
-Primo login manuale:
+### 2. Avviare Chrome con porta di Debug (CDP)
+
+Per permettere a Playwright di connettersi in modo trasparente alla tua sessione ChatGPT:
+
+```cmd
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="%TEMP%\chatgpt-cdp-profile" https://chatgpt.com/
+```
+
+### 3. Eseguire l'Agent Playwright
 
 ```bash
-python chatgpt_playwright_demo.py --login-only
+python chatgpt_playwright_demo.py --stocks AVIO.MI --no-telegram
 ```
 
-Se Google blocca il login con "browser non supportato", prova Chrome reale:
+### 4. Avviare il Frontend React
 
 ```bash
-python chatgpt_playwright_demo.py --chrome --login-only
+cd frontend
+npm install
+npm run dev
 ```
 
-Invio di un prompt:
-
-```bash
-python chatgpt_playwright_demo.py "Scrivi una frase breve di test"
-```
-
-Con Chrome reale:
-
-```bash
-python chatgpt_playwright_demo.py --chrome "Scrivi una frase breve di test"
-```
-
-Per inviare la risposta anche su Telegram:
-
-```bash
-python chatgpt_playwright_demo.py --cdp http://127.0.0.1:9222 --telegram "Cerca news di oggi su Vodafone"
-```
-
-Da PyCharm puoi creare una Run Configuration su `chatgpt_playwright_demo.py` e mettere in `Parameters`:
-
-```text
---cdp http://127.0.0.1:9222 --telegram "Cerca news di oggi su Vodafone"
-```
-
-In alternativa puoi lasciare `Parameters` vuoto: lo script costruisce un report usando `DEFAULT_COMPANY`, `DEFAULT_TICKER` e `DEFAULT_MARKET`, si collega di default a `http://127.0.0.1:9222` e invia Telegram se `SEND_TELEGRAM_BY_DEFAULT` e `True`.
-
-Per cambiare titolo senza modificare il codice:
-
-```bash
-python chatgpt_playwright_demo.py --company "Enel" --ticker "ENEL.MI" --market "Borsa Italiana"
-```
-
-Da PyCharm, in `Parameters`:
-
-```text
---company "Enel" --ticker "ENEL.MI" --market "Borsa Italiana"
-```
-
-Per analizzare una lista variabile di titoli:
-
-```bash
-python chatgpt_playwright_demo.py --stocks "VOD.L,A2A.MI,AVIO.MI"
-```
-
-Da PyCharm, in `Parameters`:
-
-```text
---stocks "VOD.L,A2A.MI,AVIO.MI"
-```
-
-Lo script apre una nuova chat per ogni ticker e invia un report Telegram per ciascun titolo. I ticker noti vengono arricchiti con nome societa e mercato tramite `STOCK_CATALOG`; per ticker non presenti in catalogo usa il ticker come nome.
-
-Puoi ancora passare un prompt completamente custom come argomento finale:
-
-```bash
-python chatgpt_playwright_demo.py "Cerca news di oggi su Telecom Italia e riassumi in 5 punti"
-```
-
-Alternativa avanzata: avvia Chrome con remote debugging e fai collegare Playwright a quel browser.
-
-Windows PowerShell:
-
-```powershell
-& "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="$env:TEMP\chatgpt-cdp-profile"
-```
-
-Poi:
-
-```bash
-python chatgpt_playwright_demo.py --cdp http://127.0.0.1:9222 "Scrivi una frase breve di test"
-```
-
-## Note
-
-I siti sorgente possono cambiare struttura HTML nel tempo. Se uno scraper smette di funzionare, usa gli script `inspect_*` per verificare rapidamente selettori, tabelle e blocchi disponibili.
+Apri `http://localhost:5173/` nel browser.
