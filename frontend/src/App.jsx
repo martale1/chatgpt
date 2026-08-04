@@ -556,14 +556,72 @@ const GENERATED_TICKER_DATA = {
 
 const generateDynamicTickerData = (ticker) => {
   const cleanTicker = ticker.trim().toUpperCase();
-  if (MOCK_DB[cleanTicker]) return MOCK_DB[cleanTicker];
-  if (GENERATED_TICKER_DATA[cleanTicker]) return GENERATED_TICKER_DATA[cleanTicker];
-  
   const isItalian = cleanTicker.endsWith(".MI");
   const isLondon = cleanTicker.endsWith(".L");
   const currency = isItalian ? "EUR" : isLondon ? "GBp" : "USD";
   const market = isItalian ? "Borsa Italiana" : isLondon ? "London Stock Exchange" : "NASDAQ / NYSE";
-  const companyName = cleanTicker.split(".")[0] + " Inc.";
+  
+  // Custom naming lookup
+  let companyName = cleanTicker.split(".")[0] + " Inc.";
+  if (cleanTicker.includes("STLAM")) {
+    companyName = "Stellantis N.V.";
+  } else if (cleanTicker.includes("TSLA")) {
+    companyName = "Tesla Inc.";
+  } else if (cleanTicker.includes("MSFT")) {
+    companyName = "Microsoft Corp.";
+  } else if (cleanTicker.includes("AAPL")) {
+    companyName = "Apple Inc.";
+  } else if (cleanTicker.includes("NVDA")) {
+    companyName = "NVIDIA Corp.";
+  } else if (cleanTicker.includes("A2A")) {
+    companyName = "A2A S.p.A.";
+  } else if (cleanTicker.includes("ISP")) {
+    companyName = "Intesa Sanpaolo S.p.A.";
+  } else if (cleanTicker.includes("UCG")) {
+    companyName = "UniCredit S.p.A.";
+  }
+
+  // Calculate a deterministic base price based on cleanTicker name hash
+  let basePrice = 25.0;
+  const hash = cleanTicker.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  
+  if (cleanTicker.includes("STLAM")) {
+    basePrice = 12.80; // Stellantis real price in EUR
+  } else if (cleanTicker.includes("A2A")) {
+    basePrice = 2.05;
+  } else if (cleanTicker.includes("ISP")) {
+    basePrice = 3.85;
+  } else if (cleanTicker.includes("UCG")) {
+    basePrice = 38.20;
+  } else if (cleanTicker.includes("TSLA")) {
+    basePrice = 220.00;
+  } else if (cleanTicker.includes("MSFT")) {
+    basePrice = 425.00;
+  } else if (cleanTicker.includes("AAPL")) {
+    basePrice = 215.00;
+  } else if (cleanTicker.includes("NVDA")) {
+    basePrice = 115.00;
+  } else if (cleanTicker.includes("VOD")) {
+    basePrice = 115.00; // GBp
+  } else {
+    // Deterministic price based on the hash (between 4.50 and 95.00)
+    basePrice = ((hash % 91) + 4) + ((hash % 10) / 10);
+  }
+
+  const formattedVal = (val) => {
+    if (isLondon) {
+      return `${Math.round(val)}p`;
+    }
+    return `${isItalian ? "€" : "$"}${val.toFixed(2)}`;
+  };
+
+  const target1 = basePrice * 1.18;
+  const target2 = basePrice * 1.05;
+  const sup1 = basePrice * 0.92;
+  const sup2 = basePrice * 0.86;
+  const res1 = basePrice * 1.08;
+  const res2 = basePrice * 1.16;
+
   const sentiment_score = 0.65;
   const overall_sentiment = "Positivo";
   
@@ -601,7 +659,7 @@ const generateDynamicTickerData = (ticker) => {
       },
       {
         id: `${cleanTicker.toLowerCase()}_news_2`,
-        headline: `${companyName} lancia un nuovo piano strategico quinquennale incentrato sulla sostenibilità`,
+        headline: `${companyName} lancia un patch strategico quinquennale incentrato sulla sostenibilità`,
         date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
         source: "Sole 24 Ore / Bloomberg",
         source_domain: isItalian ? "ilsole24ore.com" : "bloomberg.com",
@@ -627,13 +685,13 @@ const generateDynamicTickerData = (ticker) => {
       }
     ],
     analyst_ratings_and_targets: [
-      { broker: "Equita / Goldman Sachs", rating: "Buy", target_price: 150, currency: currency, date: "2026-07-25", note: "La valutazione rimane attraente rispetto ai concorrenti del settore." },
-      { broker: "Banca Akros / JP Morgan", rating: "Neutral", target_price: 135, currency: currency, date: "2026-07-20", note: "Fattori di rischio legati al contesto macroeconomico bilanciati da una solida generazione di cassa." }
+      { broker: "Equita / Goldman Sachs", rating: "Buy", target_price: target1.toFixed(2), currency: currency, date: "2026-07-25", note: "La valutazione rimane attraente rispetto ai concorrenti del settore." },
+      { broker: "Banca Akros / JP Morgan", rating: "Neutral", target_price: target2.toFixed(2), currency: currency, date: "2026-07-20", note: "Fattori di rischio legati al contesto macroeconomico bilanciati da una solida generazione di cassa." }
     ],
     technical_levels: {
-      supports: [currency === "GBp" ? "120p" : currency + " 120"],
-      resistances: [currency === "GBp" ? "145p" : currency + " 145"],
-      critical_levels_notes: `La tenuta dell'area supportiva garantisce la prosecuzione del trend laterale-rialzista. Resistenza spartiacque a quota 145.`
+      supports: [formattedVal(sup1), formattedVal(sup2)],
+      resistances: [formattedVal(res1), formattedVal(res2)],
+      critical_levels_notes: `La tenuta dell'area supportiva garantisce la prosecuzione del trend laterale-rialzista. Resistenza spartiacque a quota ${formattedVal(res1)}.`
     }
   };
 };
