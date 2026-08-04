@@ -626,9 +626,164 @@ const generateDynamicTickerData = (ticker) => {
   const res1 = basePrice * 1.08;
   const res2 = basePrice * 1.16;
 
-  const sentiment_score = 0.65;
-  const overall_sentiment = "Positivo";
-  
+  // Select scenario deterministically based on ticker name hash
+  const newsScenarios = [
+    // Scenario 0: Earnings Beat
+    {
+      overall_sentiment: "Positivo",
+      sentiment_score: 0.82,
+      expected_impact: "Rialzista di breve termine",
+      summary_explanation: `I risultati trimestrali di ${companyName} hanno battuto ampiamente le attese degli analisti su utili e ricavi, guidando un solido sentiment rialzista.`,
+      highlights: [
+        `📈 Fatturato ed EPS sopra il consensus degli analisti`,
+        `🎯 Morgan Stanley promuove il titolo a Overweight`,
+        `💪 Margini operativi in espansione grazie ad efficienze interne`
+      ],
+      news1: {
+        headline: `${companyName} batte le stime nel Q2: utile netto in crescita del 12%`,
+        category: "Financials / Earnings",
+        summary: `Risultati finanziari superiori al consensus grazie alla forte domanda internazionale e al controllo dei costi operativi.`,
+        detail: `La società ha pubblicato conti trimestrali eccellenti, superando le stime degli analisti per fatturato ed EPS. Il margine operativo si attesta al livello record dell'anno, trainato da efficienze produttive interne. La guidance per i prossimi trimestri è stata rivista al rialzo.`,
+        sentiment: "Positivo",
+        impact_rating: "Alto",
+        source: isItalian ? "Milano Finanza" : "Wall Street Journal",
+        source_domain: isItalian ? "milanofinanza.it" : "wsj.com"
+      },
+      news2: {
+        headline: `Morgan Stanley alza la raccomandazione su ${cleanTicker} a Overweight`,
+        category: "Analyst Rating",
+        summary: `Gli analisti ritengono la valutazione attuale del titolo attraente alla luce della forte generazione di cassa.`,
+        detail: `Secondo il report pubblicato stamattina, la banca d'affari evidenzia un multiplo EV/EBITDA a sconto rispetto ai competitor diretti. Il target price viene aumentato del 15% rispetto alla quotazione corrente.`,
+        sentiment: "Positivo",
+        impact_rating: "Medio",
+        source: "Bloomberg / Reuters",
+        source_domain: "bloomberg.com"
+      }
+    },
+    // Scenario 1: Partnership / Expansion
+    {
+      overall_sentiment: "Positivo",
+      sentiment_score: 0.74,
+      expected_impact: "Moderatamente rialzista",
+      summary_explanation: `L'espansione strategica di ${companyName} tramite una joint venture in Asia e il lancio di nuovi prodotti AI migliorano le prospettive di crescita del gruppo.`,
+      highlights: [
+        `🤝 Nuova joint-venture asiatica per raddoppiare la quota di mercato`,
+        `💻 Presentata la gamma prodotti integrata con intelligenza artificiale`,
+        `🚀 Feedback iniziale della clientela estremamente favorevole`
+      ],
+      news1: {
+        headline: `${companyName} firma un accordo di joint venture per l'espansione nel mercato asiatico`,
+        category: "Corporate / Expansion",
+        summary: `La partnership strategica mira a raddoppiare la quota di mercato nell'area Asia-Pacifico entro i prossimi tre anni.`,
+        detail: `L'intesa prevede la costituzione di una nuova entità legale controllata congiuntamente, focalizzata sulla distribuzione locale dei prodotti e dei servizi core del gruppo. Gli investimenti iniziali saranno finanziati tramite liquidità esistente.`,
+        sentiment: "Positivo",
+        impact_rating: "Alto",
+        source: isItalian ? "Il Sole 24 Ore" : "CNBC",
+        source_domain: isItalian ? "ilsole24ore.com" : "cnbc.com"
+      },
+      news2: {
+        headline: `${companyName} presenta la nuova gamma di prodotti basati sull'intelligenza artificiale`,
+        category: "Technology / R&D",
+        summary: `Il lancio sul mercato globale è pianificato per l'inizio del prossimo mese, con ordini preliminari già record.`,
+        detail: `I nuovi dispositivi ed applicazioni integrano funzionalità AI avanzate per ottimizzare i flussi di lavoro degli utenti business. Gli analisti prevedono un contributo positivo ai margini a partire dal prossimo anno fiscale.`,
+        sentiment: "Positivo",
+        impact_rating: "Medio",
+        source: "TechCrunch / Reuters",
+        source_domain: "reuters.com"
+      }
+    },
+    // Scenario 2: Restructuring / Labor Disputes
+    {
+      overall_sentiment: "Neutro",
+      sentiment_score: 0.52,
+      expected_impact: "Laterale con tendenza positiva",
+      summary_explanation: `Il piano di ristrutturazione di ${companyName} volto al taglio dei costi operativi è accolto positivamente sul fronte dei margini, ma pesano le tensioni sindacali in Europa.`,
+      highlights: [
+        `✂️ Taglio costi stimato a 150 milioni di euro annui`,
+        `⚠️ Scontri e scioperi sindacali in corso contro la riduzione di personale`,
+        `📊 Il mercato premia l'ottimizzazione del debito ma resta cauto`
+      ],
+      news1: {
+        headline: `${companyName} annuncia piano di riorganizzazione per ridurre i costi operativi`,
+        category: "Corporate / Restructuring",
+        summary: `Il management punta a risparmi per 150 milioni di euro annui attraverso l'efficientamento della catena di fornitura.`,
+        detail: `Il piano strategico prevede la chiusura di filiali non redditizie e l'adozione di processi digitali integrati. Il titolo reagisce positivamente in borsa (+1.8%) per il focus sulla marginalità e la riduzione del debito netto.`,
+        sentiment: "Neutro",
+        impact_rating: "Alto",
+        source: isItalian ? "Milano Finanza" : "Financial Times",
+        source_domain: isItalian ? "milanofinanza.it" : "ft.com"
+      },
+      news2: {
+        headline: `Scontri sindacali su ${cleanTicker} per il piano di riduzione del personale in Europa`,
+        category: "ESG / Labor",
+        summary: `Le trattative con i rappresentanti dei lavoratori sono in corso per limitare l'impatto occupazionale del piano industriale.`,
+        detail: `Le organizzazioni sindacali hanno espresso preoccupazione per il piano di riordino che potrebbe coinvolgere fino al 5% della forza lavoro. La dirigenza ha proposto contratti di solidarietà e prepensionamenti volontari.`,
+        sentiment: "Negativo",
+        impact_rating: "Medio",
+        source: isItalian ? "Sole 24 Ore" : "Reuters",
+        source_domain: "reuters.com"
+      }
+    },
+    // Scenario 3: ESG Certifications & Regulatory Risks
+    {
+      overall_sentiment: "Liev. Negativo",
+      sentiment_score: 0.38,
+      expected_impact: "Ribassista di breve termine",
+      summary_explanation: `Sebbene ${companyName} si posizioni tra i leader ESG, l'apertura di un'istruttoria dell'Antitrust per sospette pratiche commerciali scorrette frena il titolo in borsa.`,
+      highlights: [
+        `⚖️ Indagine dell'Antitrust avviata per presunte irregolarità commerciali`,
+        `🌱 Massimo riconoscimento ESG ottenuto per la decarbonizzazione dei siti`,
+        `📉 Rischio sanzioni fino all'1% del fatturato annuo zavorra l'intraday`
+      ],
+      news1: {
+        headline: `Indagine dell'Antitrust su ${cleanTicker} per presunte pratiche commerciali scorrette`,
+        category: "Regulatory / Law",
+        summary: `L'autorità garante ha avviato un'istruttoria su segnalazione di alcuni concorrenti locali. La società nega ogni addebito.`,
+        detail: `L'ispezione riguarda le politiche di prezzo applicate negli ultimi 18 mesi. In caso di sanzione, la multa potrebbe arrivare fino all'1% del fatturato annuo. Il titolo registra una leggera flessione intraday.`,
+        sentiment: "Negativo",
+        impact_rating: "Alto",
+        source: isItalian ? "Il Sole 24 Ore" : "Reuters",
+        source_domain: "reuters.com"
+      },
+      news2: {
+        headline: `${companyName} ottiene la certificazione ESG di massimo livello per lo stabilimento principale`,
+        category: "ESG / Sustainability",
+        summary: `Il riconoscimento premia il piano di decarbonizzazione e l'uso del 100% di energia elettrica da fonti rinnovabili.`,
+        detail: `La certificazione posiziona la società tra i leader di sostenibilità nel proprio settore industriale, facilitando l'accesso a finanziamenti ed emissioni obbligazionarie di tipo Green Bond a tassi agevolati.`,
+        sentiment: "Positivo",
+        impact_rating: "Medio",
+        source: isItalian ? "Corriere della Sera" : "Bloomberg",
+        source_domain: isItalian ? "corriere.it" : "bloomberg.com"
+      }
+    }
+  ];
+
+  const historicalNewsOptions = [
+    {
+      headline: `Consiglio di Amministrazione approva il bilancio d'esercizio di ${companyName}`,
+      summary: `I dati definitivi dell'esercizio confermano la solidità patrimoniale e la crescita dei ricavi, con proposta di dividendo in aumento.`,
+      detail: `L'assemblea degli azionisti sarà convocata a fine mese per deliberare sulla distribuzione della cedola. I flussi di cassa si mantengono stabili.`
+    },
+    {
+      headline: `${companyName} completa il collocamento di un bond da 300 milioni con richieste triple`,
+      summary: `Grande successo per l'emissione obbligazionaria riservata agli investitori istituzionali, a supporto dei piani di investimento.`,
+      detail: `I proventi del prestito saranno utilizzati per rifinanziare linee di credito in scadenza e finanziare le attività di ricerca e sviluppo.`
+    },
+    {
+      headline: `Il CEO di ${companyName} acquista azioni proprie a conferma del valore del gruppo`,
+      summary: `Operazione di internal dealing comunicata alle autorità di vigilanza. L'acquisto di titoli sul mercato rafforza la fiducia.`,
+      detail: `Il vertice aziendale ha rilevato sul mercato un pacchetto azionario significativo, sottolineando che il prezzo attuale non riflette il valore intrinseco.`
+    },
+    {
+      headline: `${companyName} nominata tra le aziende più innovative del proprio settore`,
+      summary: `Il premio internazionale valorizza gli investimenti effettuati nello sviluppo digitale e nell'esperienza utente.`,
+      detail: `La giuria ha premiato l'integrazione di brevetti industriali proprietari e l'efficacia dei nuovi canali digitali di comunicazione.`
+    }
+  ];
+
+  const selectedScenario = newsScenarios[hash % newsScenarios.length];
+  const selectedHist = historicalNewsOptions[hash % historicalNewsOptions.length];
+
   return {
     search_metadata: {
       query_input: cleanTicker,
@@ -638,52 +793,48 @@ const generateDynamicTickerData = (ticker) => {
       timestamp_utc: new Date().toISOString(),
     },
     market_sentiment_summary: {
-      overall_sentiment: overall_sentiment,
-      sentiment_score: sentiment_score,
-      expected_impact: "Moderatamente rialzista",
-      summary_explanation: `L'analisi quantitativa e il monitoraggio delle notizie su ${cleanTicker} mostrano un interesse crescente degli investitori istituzionali. Il flusso di notizie sul settore di appartenenza rimane favorevole nel breve termine.`,
-      news_highlights: [
-        `📈 Trend di medio termine positivo su ${cleanTicker}`,
-        `💬 Cresce l'interesse istituzionale sul titolo`,
-        `🎯 Consenso degli analisti orientato al rialzo`
-      ]
+      overall_sentiment: selectedScenario.overall_sentiment,
+      sentiment_score: selectedScenario.sentiment_score,
+      expected_impact: selectedScenario.expected_impact,
+      summary_explanation: selectedScenario.summary_explanation,
+      news_highlights: selectedScenario.highlights
     },
     recent_news_last_3_days: [
       {
         id: `${cleanTicker.toLowerCase()}_news_1`,
-        headline: `${companyName} annuncia risultati trimestrali superiori alle stime di consenso`,
+        headline: selectedScenario.news1.headline,
         date: new Date().toISOString().split('T')[0],
-        source: "Milano Finanza / CNBC",
-        source_domain: isItalian ? "milanofinanza.it" : "cnbc.com",
-        category: "Financials / Earnings",
-        summary: `I ricavi totali del trimestre superano le stime del 5%. Il management esprime ottimismo per il resto dell'anno finanziario.`,
-        detail: `La società ha pubblicato i conti del secondo trimestre con ricavi a livelli record, battendo il consensus degli analisti del 5%. Il margine operativo si è espanso grazie a efficienze interne. Il management ha rivisto al rialzo la guidance per l'intero anno fiscale, sostenendo le aspettative di crescita a doppia cifra del titolo.`,
-        sentiment: "Positivo",
-        impact_rating: "Alto"
+        source: selectedScenario.news1.source,
+        source_domain: selectedScenario.news1.source_domain,
+        category: selectedScenario.news1.category,
+        summary: selectedScenario.news1.summary,
+        detail: selectedScenario.news1.detail,
+        sentiment: selectedScenario.news1.sentiment,
+        impact_rating: selectedScenario.news1.impact_rating
       },
       {
         id: `${cleanTicker.toLowerCase()}_news_2`,
-        headline: `${companyName} lancia un patch strategico quinquennale incentrato sulla sostenibilità`,
+        headline: selectedScenario.news2.headline,
         date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
-        source: "Sole 24 Ore / Bloomberg",
-        source_domain: isItalian ? "ilsole24ore.com" : "bloomberg.com",
-        category: "Strategia / ESG",
-        summary: `Il piano prevede forti investimenti nello sviluppo tecnologico e nella riduzione dell'impronta carbonica entro il 2030.`,
-        detail: `Il piano strategico svelato alla comunità finanziaria prevede un focus sulla transizione digitale e sostenibile. Gli investimenti pianificati ammontano a cifre considerevoli e saranno coperti interamente dai flussi di cassa operativi, senza ricorrere a nuovo indebitamento. Gli investitori ESG hanno reagito positivamente alla presentazione dei target ambientali.`,
-        sentiment: "Positivo",
-        impact_rating: "Medio"
+        source: selectedScenario.news2.source,
+        source_domain: selectedScenario.news2.source_domain,
+        category: selectedScenario.news2.category,
+        summary: selectedScenario.news2.summary,
+        detail: selectedScenario.news2.detail,
+        sentiment: selectedScenario.news2.sentiment,
+        impact_rating: selectedScenario.news2.impact_rating
       }
     ],
     latest_available_news: [
       {
         id: `${cleanTicker.toLowerCase()}_news_3`,
-        headline: `Gli analisti promuovono ${cleanTicker} dopo la recente conferenza con gli investitori`,
+        headline: selectedHist.headline,
         date: new Date(Date.now() - 345600000).toISOString().split('T')[0],
-        source: "Reuters / WebSim",
+        source: isItalian ? "Reuters / Il Sole 24 Ore" : "Reuters / WebSim",
         source_domain: "reuters.com",
-        category: "Analyst Day",
-        summary: `Diversi broker hanno confermato o alzato il target price dopo l'incontro annuale sul posizionamento di mercato.`,
-        detail: `A seguito dell'Analyst Day, le principali case d'affari hanno espresso soddisfazione per la visibilità del portafoglio ordini e per il controllo dei costi. La quota di mercato del gruppo rimane stabile nei segmenti chiave.`,
+        category: "Corporate Bilanci",
+        summary: selectedHist.summary,
+        detail: selectedHist.detail,
         sentiment: "Positivo",
         impact_rating: "Medio"
       }
