@@ -100,12 +100,20 @@ export default function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Risultati reali ricevuti da ChatGPT (persistiti in localStorage)
+  // Risultati reali ricevuti da ChatGPT (persistiti in localStorage con validazione)
   const [realTickerData, setRealTickerData] = useState(() => {
     const saved = localStorage.getItem('real_ticker_data');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        const cleaned = {};
+        for (const [key, val] of Object.entries(parsed)) {
+          // Valida che il ticker salvato corrisponda alla chiave (evita cache corrotte da vecchi bug)
+          if (val?.search_metadata?.ticker === key) {
+            cleaned[key] = val;
+          }
+        }
+        return cleaned;
       } catch (e) {
         console.error('Errore parsing real_ticker_data da localStorage', e);
       }
@@ -267,6 +275,11 @@ export default function App() {
   // ── Rimuovi ticker dalla watchlist ───────────────────────────────────────
   const removeFromWatchlist = (targetToRemove) => {
     setWatchlist(prev => prev.filter(t => t !== targetToRemove));
+    setRealTickerData(prev => {
+      const copy = { ...prev };
+      delete copy[targetToRemove];
+      return copy;
+    });
     if (query === targetToRemove) {
       setData(null);
       setQuery('');
