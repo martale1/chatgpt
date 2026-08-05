@@ -137,6 +137,7 @@ export default function App() {
   const runAgentAnalysis = (target) => {
     if (!target) return;
 
+    setQuery(target);     // imposta subito il ticker corrente
     setLoading(true);
     setLogs([]);
     setActiveTab('logs');
@@ -181,8 +182,12 @@ export default function App() {
             const realData = eventData.data;
             // Salva i dati reali ricevuti da ChatGPT
             setRealTickerData(prev => ({ ...prev, [target]: realData }));
-            setData(realData);
-            setQuery(target);
+            // Aggiorna la dashboard solo se l'utente sta ancora guardando questo ticker
+            setQuery(prev => {
+              if (prev === target) setData(realData);
+              return prev;
+            });
+            // NON sovrascriviamo query qui: l'utente potrebbe aver già selezionato un altro ticker
             eventSource.close();
             setLoading(false);
             setLogs(prev => [...prev, {
