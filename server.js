@@ -223,8 +223,8 @@ const server = http.createServer((req, res) => {
     const args = [
       path.join(__dirname, 'chatgpt_playwright_demo.py'),
       '--ticker', ticker,
-      '--company', info.company,
-      '--market', info.market,
+      '--company', `"${info.company}"`,
+      '--market', `"${info.market}"`,
       '--no-telegram'
     ];
 
