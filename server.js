@@ -1,4 +1,4 @@
-﻿const http = require('http');
+const http = require('http');
 const url = require('url');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -103,8 +103,8 @@ const server = http.createServer((req, res) => {
     const args = [
       path.join(__dirname, 'chatgpt_playwright_demo.py'),
       '--ticker', ticker,
-      '--company', `"${info.company}"`,
-      '--market', `"${info.market}"`,
+      '--company', info.company,
+      '--market', info.market,
       '--no-telegram'
     ];
 

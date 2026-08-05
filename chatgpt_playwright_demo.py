@@ -1,4 +1,4 @@
-﻿import argparse
+import argparse
 import os
 import sys
 from pathlib import Path
@@ -380,7 +380,14 @@ def main():
     )
     args = parser.parse_args()
     send_to_telegram = False if args.no_telegram else (args.telegram or SEND_TELEGRAM_BY_DEFAULT)
-    stocks = parse_stock_list(args.stocks)
+    if args.stocks:
+        stock_list = [stock_from_ticker(t) for t in parse_stock_list(args.stocks)]
+    else:
+        stock_list = [{
+            "ticker": args.ticker.strip().strip('"').strip("'").upper(),
+            "company": args.company.strip().strip('"').strip("'"),
+            "market": args.market.strip().strip('"').strip("'")
+        }]
 
     with sync_playwright() as p:
         context = None
@@ -424,9 +431,8 @@ def main():
             if send_to_telegram and response:
                 send_telegram_message(response)
         else:
-            for index, ticker in enumerate(stocks, start=1):
-                stock = stock_from_ticker(ticker)
-                response = run_stock_report(context, stock, index, len(stocks))
+            for index, stock in enumerate(stock_list, start=1):
+                response = run_stock_report(context, stock, index, len(stock_list))
                 if send_to_telegram and response:
                     send_telegram_message(response)
                 pause_between_reports(context)
