@@ -264,6 +264,15 @@ export default function App() {
     handleSearch(tickers[0]);
   };
 
+  // ── Rimuovi ticker dalla watchlist ───────────────────────────────────────
+  const removeFromWatchlist = (targetToRemove) => {
+    setWatchlist(prev => prev.filter(t => t !== targetToRemove));
+    if (query === targetToRemove) {
+      setData(null);
+      setQuery('');
+    }
+  };
+
   // ── Badge / indicatori ────────────────────────────────────────────────────
   const getSentimentBadge = (sentiment) => {
     const s = sentiment?.toLowerCase() || '';
@@ -354,14 +363,32 @@ export default function App() {
         <div className="quick-tickers">
           <span className="quick-label">Watchlist:</span>
           {watchlist.map((item) => (
-            <button
+            <span
               key={item}
               className={`chip${data?.search_metadata?.ticker === item ? ' chip-active' : ''}`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}
               onClick={() => handleSearch(item)}
             >
               {item}
-              {realTickerData[item] && <span style={{ color: '#22c55e', marginLeft: '4px' }}>●</span>}
-            </button>
+              {realTickerData[item] && <span style={{ color: '#22c55e' }}>●</span>}
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeFromWatchlist(item);
+                }}
+                style={{
+                  color: '#94a3b8',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  padding: '0 2px',
+                  borderRadius: '50%',
+                  lineHeight: '1'
+                }}
+                title={`Rimuovi ${item} dalla Watchlist`}
+              >
+                ✕
+              </span>
+            </span>
           ))}
         </div>
       </div>
@@ -415,7 +442,7 @@ export default function App() {
                   )}
                 </span>
                 <span className="wt-impact">{row.impact}</span>
-                <span>
+                <span style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                   <button
                     className={row.analyzed ? 'btn-secondary' : 'btn-primary'}
                     style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
@@ -426,6 +453,24 @@ export default function App() {
                     }}
                   >
                     {row.analyzed ? '🔄 Aggiorna' : '⚡ Analizza Live'}
+                  </button>
+                  <button
+                    style={{
+                      padding: '0.3rem 0.5rem',
+                      fontSize: '0.75rem',
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      border: '1px solid rgba(239, 68, 68, 0.4)',
+                      color: '#ef4444',
+                      borderRadius: '6px',
+                      cursor: 'pointer'
+                    }}
+                    title={`Rimuovi ${row.ticker} dalla Watchlist`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFromWatchlist(row.ticker);
+                    }}
+                  >
+                    🗑️
                   </button>
                 </span>
               </div>
