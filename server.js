@@ -108,9 +108,9 @@ const server = http.createServer((req, res) => {
       '--no-telegram'
     ];
 
-    res.write(`data: ${JSON.stringify({ type: 'log', agent: 'Playwright Scraper Agent', msg: `Eseguo: python3 chatgpt_playwright_demo.py --ticker ${ticker} --company "${info.company}"` })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'log', agent: 'Playwright Scraper Agent', msg: `Eseguo: python3 chatgpt_playwright_demo.py --ticker ${ticker} --company "${info.company}" --market "${info.market}"` })}\n\n`);
 
-    const scraperProcess = spawn(`"${PYTHON_PATH}"`, args, { shell: true });
+    const scraperProcess = spawn(PYTHON_PATH, args, { shell: false });
 
     let scraperOutput = '';
 
