@@ -100,20 +100,13 @@ export default function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Risultati reali ricevuti da ChatGPT (persistiti in localStorage con validazione)
+  // Risultati reali ricevuti da ChatGPT (persistiti in localStorage)
   const [realTickerData, setRealTickerData] = useState(() => {
     const saved = localStorage.getItem('real_ticker_data');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        const cleaned = {};
-        for (const [key, val] of Object.entries(parsed)) {
-          // Valida che il ticker salvato corrisponda alla chiave (evita cache corrotte da vecchi bug)
-          if (val?.search_metadata?.ticker === key) {
-            cleaned[key] = val;
-          }
-        }
-        return cleaned;
+        if (parsed && typeof parsed === 'object') return parsed;
       } catch (e) {
         console.error('Errore parsing real_ticker_data da localStorage', e);
       }
@@ -148,7 +141,7 @@ export default function App() {
   // Carica all'avvio il primo ticker analizzato se disponibile
   useEffect(() => {
     const keys = Object.keys(realTickerData);
-    if (keys.length > 0 && !query && !data) {
+    if (keys.length > 0) {
       const first = keys[0];
       setQuery(first);
       setData(realTickerData[first]);
