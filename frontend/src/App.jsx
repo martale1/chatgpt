@@ -313,11 +313,22 @@ export default function App() {
     const col = score !== null
       ? getSentimentColor(score)
       : { bg: 'rgba(100,116,139,0.08)', border: '#475569', text: '#94a3b8', label: '—' };
+    const timestamp = d?.search_metadata?.timestamp_utc
+      ? new Date(d.search_metadata.timestamp_utc).toLocaleString('it-IT', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      : null;
+
     return {
       ticker: t,
       company: d?.search_metadata?.company_name || t,
       market: d?.search_metadata?.market || '—',
       analyzed: !!d,
+      timestamp,
       score,
       col,
       sentiment: s?.overall_sentiment || '⏳ Non analizzato',
@@ -422,6 +433,11 @@ export default function App() {
                 <span className="wt-ticker" style={{ color: row.col.text }}>
                   {row.ticker}
                   <span className="wt-company">{row.company}</span>
+                  {row.timestamp && (
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px', display: 'block', fontWeight: 'normal' }}>
+                      📅 {row.timestamp}
+                    </span>
+                  )}
                 </span>
                 <span className="wt-market">{row.market}</span>
                 <span>
