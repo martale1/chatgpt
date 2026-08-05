@@ -147,14 +147,22 @@ export default function App() {
     }
   }, []);
 
-  // ── Cerca ticker: mostra dati reali già ricevuti, altrimenti empty state ──
-  const handleSearch = (searchTerm) => {
+  // ── Cerca ticker: mostra dati se disponibili, altrimenti avvia subito l'analisi ──
+  const handleSearch = (searchTerm, autoAnalyze = true) => {
     const target = (searchTerm || query).trim().toUpperCase();
     if (!target) return;
     setQuery(target);
-    setData(realTickerData[target] || null);
     setWatchlist(prev => prev.includes(target) ? prev : [...prev, target]);
-    setActiveTab('dashboard');
+
+    if (realTickerData[target]) {
+      setData(realTickerData[target]);
+      setActiveTab('dashboard');
+    } else if (autoAnalyze) {
+      runAgentAnalysis(target);
+    } else {
+      setData(null);
+      setActiveTab('dashboard');
+    }
   };
 
   // ── Avvia analisi reale via Playwright → server.js → ChatGPT ──────────────
@@ -373,7 +381,7 @@ export default function App() {
             <span>Sentiment</span>
             <span>Score</span>
             <span>Impatto</span>
-            <span>Punto Chiave</span>
+            <span>Azione</span>
           </div>
           {watchlistRows.map((row) => {
             const isActive = data?.search_metadata?.ticker === row.ticker;
@@ -381,8 +389,8 @@ export default function App() {
               <div
                 key={row.ticker}
                 className={`wt-row${isActive ? ' wt-row-active' : ''}`}
-                style={{ borderLeft: `3px solid ${row.col.border}`, background: isActive ? 'rgba(56,189,248,0.06)' : row.col.bg }}
-                onClick={() => handleSearch(row.ticker)}
+                style={{ borderLeft: `3px solid ${row.col.border}`, background: isActive ? 'rgba(56,189,248,0.06)' : row.col.bg, cursor: 'pointer' }}
+                onClick={() => handleSearch(row.ticker, true)}
               >
                 <span className="wt-ticker" style={{ color: row.col.text }}>
                   {row.ticker}
@@ -407,7 +415,19 @@ export default function App() {
                   )}
                 </span>
                 <span className="wt-impact">{row.impact}</span>
-                <span className="wt-highlight">{row.highlight}</span>
+                <span>
+                  <button
+                    className={row.analyzed ? 'btn-secondary' : 'btn-primary'}
+                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                    disabled={loading}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      runAgentAnalysis(row.ticker);
+                    }}
+                  >
+                    {row.analyzed ? '🔄 Aggiorna' : '⚡ Analizza Live'}
+                  </button>
+                </span>
               </div>
             );
           })}
