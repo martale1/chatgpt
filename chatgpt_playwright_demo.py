@@ -207,9 +207,24 @@ def wait_for_response(page, initial_assistant_count=0, timeout_seconds=RESPONSE_
 
 def open_chatgpt_page(context_or_browser):
     page = context_or_browser.new_page()
-    page.goto(CHATGPT_URL, wait_until="domcontentloaded")
+    # Apre SEMPRE una nuova conversazione per evitare contaminazione dal contesto precedente
+    page.goto("https://chatgpt.com/", wait_until="domcontentloaded")
+    page.bring_to_front()
+    # Naviga a una nuova chat vuota
+    try:
+        new_chat_btn = page.locator("a[href='/']").first
+        new_chat_btn.wait_for(state="visible", timeout=3000)
+        new_chat_btn.click()
+        page.wait_for_load_state("domcontentloaded")
+    except Exception:
+        # Fallback: naviga direttamente a /new
+        try:
+            page.goto("https://chatgpt.com/new", wait_until="domcontentloaded")
+        except Exception:
+            pass
     page.bring_to_front()
     return page
+
 
 
 def run_in_page(page, prompt, login_only):
