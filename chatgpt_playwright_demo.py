@@ -1,4 +1,4 @@
-import argparse
+﻿import argparse
 import os
 import sys
 from pathlib import Path
@@ -52,46 +52,88 @@ def build_stock_prompt(company, ticker="", market=""):
     if market:
         instrument += f" - {market}"
 
-    title = company.upper()
-    if ticker:
-        title += f" / {ticker.upper()}"
+    return f"""Cerca news di oggi e degli ultimi 3 giorni su {instrument}.
+Rispondi SOLO con un blocco JSON valido, nessun testo prima o dopo.
+Usa esattamente questo schema JSON (sostituisci i valori tra [ ]):
 
-    return f"""Cerca news di oggi e degli ultimi 3 giorni su {instrument}. Rispondi in italiano e usa esattamente questo formato:
+```json
+{{
+  "search_metadata": {{
+    "query_input": "{ticker}",
+    "company_name": "{company}",
+    "ticker": "{ticker}",
+    "market": "{market}",
+    "timestamp_utc": "[data e ora UTC attuale in formato ISO 8601]"
+  }},
+  "market_sentiment_summary": {{
+    "overall_sentiment": "[Molto Positivo / Positivo / Neutro / Negativo / Molto Negativo]",
+    "sentiment_score": [numero da 0.0 a 1.0],
+    "expected_impact": "[descrizione breve impatto atteso sul titolo]",
+    "summary_explanation": "[analisi approfondita del sentiment complessivo, minimo 3 frasi, senza riassumere ma spiegando il contesto]",
+    "news_highlights": [
+      "[punto chiave notizia 1]",
+      "[punto chiave notizia 2]",
+      "[punto chiave notizia 3]"
+    ]
+  }},
+  "recent_news_last_3_days": [
+    {{
+      "id": "news_1",
+      "headline": "[titolo completo della notizia]",
+      "date": "[YYYY-MM-DD]",
+      "source": "[nome testata giornalistica]",
+      "source_domain": "[dominio es. reuters.com]",
+      "url": "[URL articolo originale oppure null]",
+      "category": "[categoria es. Risultati / M&A / Regolatorio / Macro / Settoriale]",
+      "summary": "[primo paragrafo della notizia]",
+      "detail": "[testo completo e dettagliato della notizia, senza riassumere, con tutti i numeri, percentuali e dichiarazioni originali]",
+      "sentiment": "[Positivo / Neutro / Negativo / Molto Positivo / Molto Negativo]",
+      "impact_rating": "[Alto / Medio / Basso / Molto Alto]"
+    }}
+  ],
+  "latest_available_news": [
+    {{
+      "id": "hist_news_1",
+      "headline": "[titolo notizia storica rilevante]",
+      "date": "[YYYY-MM-DD]",
+      "source": "[nome testata]",
+      "source_domain": "[dominio]",
+      "url": "[URL oppure null]",
+      "category": "[categoria]",
+      "summary": "[primo paragrafo]",
+      "detail": "[testo completo dettagliato]",
+      "sentiment": "[sentiment]",
+      "impact_rating": "[impatto]"
+    }}
+  ],
+  "analyst_ratings_and_targets": [
+    {{
+      "broker": "[nome banca/broker]",
+      "rating": "[Buy / Hold / Sell / Neutral / Outperform]",
+      "target_price": "[prezzo target]",
+      "currency": "[EUR / USD / GBp]",
+      "date": "[data aggiornamento YYYY-MM-DD]",
+      "note": "[note aggiuntive dell'analista]"
+    }}
+  ],
+  "technical_levels": {{
+    "supports": ["[S1 con valuta]", "[S2 con valuta]"],
+    "resistances": ["[R1 con valuta]", "[R2 con valuta]"],
+    "critical_levels_notes": "[note sui livelli tecnici chiave]"
+  }}
+}}
+```
 
-📌 {title} - REPORT GIORNALIERO NOTIZIE
-
-🗓 Data dell'analisi: [data di oggi]
-
-📰 News rilevanti:
-- [Data Notizia] [Titolo Notizia]
-  * Testo Completo: [Riporta l'intero testo esteso ed esplicativo della notizia senza riassumerlo, includendo tutti i dettagli operativi, numeri, percentuali e dichiarazioni]
-  * Sentiment: [Positivo / Neutro / Negativo]
-  * Impatto: [Alto / Medio / Basso]
-  * Link Fonte: [URL dell'articolo originale, se trovato, altrimenti scrivere "non disponibile"]
-
-🎯 Target price / analisti (aggiornamenti recenti):
-- [broker/banca]: [target price con valuta] - [rating] - [data] - [Link/Fonte se disponibile]
-Se non trovi aggiornamenti recenti, scrivi: Nessun aggiornamento recente sui target price.
-
-📈 Livelli tecnici chiave:
-- Supporti: S1: [valuta e livello], S2: [valuta e livello]
-- Resistenze: R1: [valuta e livello], R2: [valuta e livello]
-
-🧭 Sintesi del Sentiment generale:
-[Analisi approfondita ed estesa sul sentiment complessivo emerso dalle notizie e l'impatto atteso sul titolo]
-
-🔗 Fonti consultate (fino a 5 fonti, con URL se disponibile):
-- [Nome Fonte 1] - [URL link]
-- [Nome Fonte 2] - [URL link]
-
-Regole operative:
-- NON RIASSUMERE LE NOTIZIE: fornisci il testo esteso e dettagliato esattamente come estratto dalla fonte.
-- Non inventare dati o URL. Se un dato o un link non è disponibile, scrivi "non disponibile".
-- Fornisci solo notizie reali pubblicate da testate giornalistiche o comunicati stampa ufficiali.
-- Se trovi livelli tecnici o target price, specifica sempre la valuta di riferimento (es. EUR, USD, GBp)."""
+Regole:
+- Rispondi SOLO con il JSON. Nessun testo prima o dopo il blocco ```json```.
+- Non inventare dati. Se un campo non e' disponibile, usa null o array vuoto [].
+- Il campo "detail" deve contenere il testo COMPLETO della notizia, non riassunto.
+- Includi tutte le notizie trovate negli ultimi 3 giorni in recent_news_last_3_days.
+- Includi notizie storiche rilevanti degli ultimi 30 giorni in latest_available_news."""
 
 
 DEFAULT_PROMPT = build_stock_prompt(DEFAULT_COMPANY, DEFAULT_TICKER, DEFAULT_MARKET)
+
 
 
 def parse_stock_list(value):

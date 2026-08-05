@@ -1,4 +1,4 @@
-const http = require('http');
+﻿const http = require('http');
 const url = require('url');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -25,171 +25,51 @@ function getCompanyInfo(ticker) {
   return catalog[clean] || { company: clean.split('.')[0], market: clean.endsWith(".MI") ? "Borsa Italiana" : clean.endsWith(".L") ? "London Stock Exchange" : "NASDAQ" };
 }
 
-// Simple parser for the ChatGPT report
+// Extract JSON from ChatGPT response - no fragile regex, just JSON.parse
 function parseReport(text, ticker, company) {
-  const isItalian = ticker.endsWith(".MI");
-  const isLondon = ticker.endsWith(".L");
-  const currency = isItalian ? "EUR" : isLondon ? "GBp" : "USD";
+  // Try to extract JSON block from ```json ... ``` or raw JSON object
+  let jsonStr = null;
 
-  const result = {
-    search_metadata: {
-      query_input: ticker,
-      company_name: company,
-      ticker: ticker,
-      market: isItalian ? "Borsa Italiana" : isLondon ? "London Stock Exchange" : "NASDAQ / NYSE",
-      timestamp_utc: new Date().toISOString(),
-    },
-    market_sentiment_summary: {
-      overall_sentiment: "Neutro",
-      sentiment_score: 0.5,
-      expected_impact: "Laterale",
-      summary_explanation: "",
-      news_highlights: []
-    },
-    recent_news_last_3_days: [],
-    latest_available_news: [],
-    analyst_ratings_and_targets: [],
-    technical_levels: {
-      supports: [],
-      resistances: [],
-      critical_levels_notes: ""
+  const fenceMatch = text.match(/```json\s*([\s\S]*?)```/i);
+  if (fenceMatch) {
+    jsonStr = fenceMatch[1].trim();
+  } else {
+    // Fallback: find first { ... } spanning the whole text
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start !== -1 && end > start) {
+      jsonStr = text.slice(start, end + 1);
     }
-  };
+  }
 
+  if (!jsonStr) {
+    throw new Error('Nessun blocco JSON trovato nella risposta di ChatGPT. Risposta ricevuta:\n' + text.slice(0, 500));
+  }
+
+  let parsed;
   try {
-    // Extract Sentiment General
-    const sentimentMatch = text.match(/Sintesi del Sentiment generale:\s*\n*([^]*?)(?=\n\n|\n🔗|\n🎨|\n🎯|\n📈|$)/i);
-    if (sentimentMatch) {
-      const summaryText = sentimentMatch[1].trim();
-      result.market_sentiment_summary.summary_explanation = summaryText;
-      
-      const lower = summaryText.toLowerCase();
-      if (lower.includes("molto positivo") || lower.includes("rialzista forte")) {
-        result.market_sentiment_summary.overall_sentiment = "Molto Positivo";
-        result.market_sentiment_summary.sentiment_score = 0.88;
-        result.market_sentiment_summary.expected_impact = "Rialzista di breve termine";
-      } else if (lower.includes("positivo") || lower.includes("rialzista")) {
-        result.market_sentiment_summary.overall_sentiment = "Positivo";
-        result.market_sentiment_summary.sentiment_score = 0.72;
-        result.market_sentiment_summary.expected_impact = "Moderatamente rialzista";
-      } else if (lower.includes("molto negativo") || lower.includes("ribassista forte")) {
-        result.market_sentiment_summary.overall_sentiment = "Negativo";
-        result.market_sentiment_summary.sentiment_score = 0.12;
-        result.market_sentiment_summary.expected_impact = "Ribassista forte";
-      } else if (lower.includes("negativo") || lower.includes("ribassista")) {
-        result.market_sentiment_summary.overall_sentiment = "Liev. Negativo";
-        result.market_sentiment_summary.sentiment_score = 0.35;
-        result.market_sentiment_summary.expected_impact = "Moderatamente ribassista";
-      }
-    }
-
-    // Extract News items
-    const newsSection = text.match(/📰 News rilevanti:\s*\n*([^]*?)(?=\n\n|\n🎯|\n📈|\n🧭|$)/i);
-    if (newsSection) {
-      // Split on news bullet points (ex: - [date] Title or - Title)
-      const newsLines = newsSection[1].split(/(?=\n-\s*\[)/);
-      newsLines.forEach((block, idx) => {
-        const headlineMatch = block.match(/-\s*\[(.*?)\]\s*(.*?)(?:\n|$)/);
-        if (!headlineMatch) return;
-        
-        const date = headlineMatch[1].trim();
-        const headline = headlineMatch[2].trim();
-        
-        const sintesiMatch = block.match(/\*\s*(?:Testo Completo|Testo|Sintesi|Dettaglio):\s*([^]*?)(?=\n\s*\*|\n-\s*\[|$)/i);
-        const sentimentMatchNews = block.match(/\*\s*Sentiment:\s*(.*?)(?:\n|$)/i);
-        const impattoMatch = block.match(/\*\s*Impatto:\s*(.*?)(?:\n|$)/i);
-        const linkMatch = block.match(/\*\s*Link Fonte:\s*(.*?)(?:\n|$)/i);
-
-        const summary = sintesiMatch ? sintesiMatch[1].trim() : "";
-        const sentiment = sentimentMatchNews ? sentimentMatchNews[1].trim() : "Neutro";
-        const impact = impattoMatch ? impattoMatch[1].trim() : "Medio";
-        let url = linkMatch && linkMatch[1].trim() !== "non disponibile" ? linkMatch[1].trim() : "";
-        if (url && !url.startsWith("http")) {
-          url = "";
-        }
-
-        const newsItem = {
-          id: `${ticker.toLowerCase()}_live_news_${idx}`,
-          headline,
-          date,
-          source: url ? new URL(url).hostname.replace('www.', '') : ticker.endsWith(".MI") ? "Milano Finanza" : "Reuters",
-          source_domain: url ? new URL(url).hostname : ticker.endsWith(".MI") ? "milanofinanza.it" : "reuters.com",
-          category: "Live News",
-          summary,
-          detail: summary,
-          sentiment,
-          impact_rating: impact,
-          url
-        };
-        
-        result.recent_news_last_3_days.push(newsItem);
-        result.market_sentiment_summary.news_highlights.push(`📰 ${headline} (${sentiment})`);
-      });
-    }
-
-    // Extract Analyst Ratings
-    const analystSection = text.match(/🎯 Target price \/ analisti[^]*?:\s*\n*([^]*?)(?=\n\n|\n📈|\n🧭|$)/i);
-    if (analystSection) {
-      const lines = analystSection[1].split('\n').filter(l => l.trim().startsWith('-'));
-      lines.forEach(line => {
-        const parts = line.replace(/^-\s*/, '').split(':');
-        if (parts.length < 2) return;
-        const broker = parts[0].trim();
-        const details = parts[1].split('-');
-        if (details.length >= 2) {
-          const targetPrice = details[0].trim();
-          const rating = details[1].trim();
-          const date = details[2] ? details[2].trim() : "Recente";
-          result.analyst_ratings_and_targets.push({
-            broker,
-            rating,
-            target_price: targetPrice,
-            currency,
-            date,
-            note: `Valutazione espressa dagli analisti di ${broker}.`
-          });
-        }
-      });
-    }
-
-    // Extract technical levels
-    const levelsSection = text.match(/📈 Livelli tecnici chiave:\s*\n*([^]*?)(?=\n\n|\n🧭|\n🔗|$)/i);
-    if (levelsSection) {
-      const supMatch = levelsSection[1].match(/Supporti:\s*S1:\s*(.*?),?\s*S2:\s*(.*?)(?:\n|,|$)/i);
-      const resMatch = levelsSection[1].match(/Resistenze:\s*R1:\s*(.*?),?\s*R2:\s*(.*?)(?:\n|,|$)/i);
-      
-      if (supMatch) {
-        result.technical_levels.supports = [supMatch[1].trim(), supMatch[2].trim()];
-      }
-      if (resMatch) {
-        result.technical_levels.resistances = [resMatch[1].trim(), resMatch[2].trim()];
-      }
-      
-      result.technical_levels.critical_levels_notes = `Supporti e resistenze chiave estratti dall'analisi tecnica di ChatGPT. Resistenza spartiacque a quota ${result.technical_levels.resistances[0] || 'N/A'}.`;
-    }
-
-  } catch (err) {
-    console.error("Error parsing ChatGPT report text:", err);
+    parsed = JSON.parse(jsonStr);
+  } catch (e) {
+    throw new Error('JSON non valido nella risposta di ChatGPT: ' + e.message + '\n\nContenuto:\n' + jsonStr.slice(0, 500));
   }
 
-  // Fallback default arrays if empty
-  if (result.recent_news_last_3_days.length === 0) {
-    result.recent_news_last_3_days.push({
-      id: `${ticker.toLowerCase()}_fallback_1`,
-      headline: `Nessuna notizia strutturata trovata nel testo di ChatGPT`,
-      date: new Date().toISOString().split('T')[0],
-      source: "ChatGPT Scraper",
-      source_domain: "chatgpt.com",
-      category: "Info",
-      summary: "ChatGPT non ha restituito notizie strutturate nel formato richiesto. Ispeziona i log completi nel terminale per leggere la risposta testuale grezza.",
-      detail: text,
-      sentiment: "Neutro",
-      impact_rating: "Basso"
-    });
-  }
+  // Ensure required top-level fields exist with safe defaults
+  const isItalian = ticker.endsWith('.MI');
+  const isLondon = ticker.endsWith('.L');
+  parsed.search_metadata = parsed.search_metadata || {};
+  parsed.search_metadata.ticker = ticker;
+  parsed.search_metadata.company_name = parsed.search_metadata.company_name || company;
+  parsed.search_metadata.market = parsed.search_metadata.market || (isItalian ? 'Borsa Italiana' : isLondon ? 'London Stock Exchange' : 'NASDAQ / NYSE');
+  parsed.search_metadata.timestamp_utc = parsed.search_metadata.timestamp_utc || new Date().toISOString();
+  parsed.market_sentiment_summary = parsed.market_sentiment_summary || { overall_sentiment: 'Neutro', sentiment_score: 0.5, expected_impact: '', summary_explanation: '', news_highlights: [] };
+  parsed.recent_news_last_3_days = parsed.recent_news_last_3_days || [];
+  parsed.latest_available_news = parsed.latest_available_news || [];
+  parsed.analyst_ratings_and_targets = parsed.analyst_ratings_and_targets || [];
+  parsed.technical_levels = parsed.technical_levels || { supports: [], resistances: [], critical_levels_notes: '' };
 
-  return result;
+  return parsed;
 }
+
 
 // Create HTTP server
 const server = http.createServer((req, res) => {

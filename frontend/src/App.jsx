@@ -100,8 +100,18 @@ export default function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Risultati reali ricevuti da ChatGPT in questa sessione (non persistiti in localStorage)
-  const [realTickerData, setRealTickerData] = useState({});
+  // Risultati reali ricevuti da ChatGPT (persistiti in localStorage)
+  const [realTickerData, setRealTickerData] = useState(() => {
+    const saved = localStorage.getItem('real_ticker_data');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Errore parsing real_ticker_data da localStorage', e);
+      }
+    }
+    return {};
+  });
 
   // Watchlist persistita
   const [watchlist, setWatchlist] = useState(() => {
@@ -122,6 +132,20 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('watchlist_tickers', JSON.stringify(watchlist));
   }, [watchlist]);
+
+  useEffect(() => {
+    localStorage.setItem('real_ticker_data', JSON.stringify(realTickerData));
+  }, [realTickerData]);
+
+  // Carica all'avvio il primo ticker analizzato se disponibile
+  useEffect(() => {
+    const keys = Object.keys(realTickerData);
+    if (keys.length > 0 && !query && !data) {
+      const first = keys[0];
+      setQuery(first);
+      setData(realTickerData[first]);
+    }
+  }, []);
 
   // ── Cerca ticker: mostra dati reali già ricevuti, altrimenti empty state ──
   const handleSearch = (searchTerm) => {
