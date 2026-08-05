@@ -258,29 +258,27 @@ const server = http.createServer((req, res) => {
 
     scraperProcess.on('close', (code) => {
       res.write(`data: ${JSON.stringify({ type: 'log', agent: 'Controller & Orchestrator Agent', msg: `Scraper concluso con codice: ${code}` })}\n\n`);
-      
-      const tickerClean = ticker.trim().toUpperCase();
-      const newsFilePath = path.join(__dirname, 'output', 'stock_ai', tickerClean.replace('/', '_'), `${tickerClean}_news.txt`);
 
-      if (fs.existsSync(newsFilePath)) {
-        try {
-          const rawText = fs.readFileSync(newsFilePath, 'utf-8');
-          
-          const marker = "--- Risposta ChatGPT ---";
-          let chatGptResponse = rawText;
-          if (rawText.includes(marker)) {
-            chatGptResponse = rawText.split(marker)[1].trim();
-          }
-          
-          const parsedData = parseReport(chatGptResponse, tickerClean, info.company);
-          
-          res.write(`data: ${JSON.stringify({ type: 'data', data: parsedData })}\n\n`);
-        } catch (err) {
-          res.write(`data: ${JSON.stringify({ type: 'error', msg: `Errore parsing report: ${err.message}` })}\n\n`);
+      try {
+        // Parse ChatGPT response directly from stdout (Python script prints, does not write files)
+        const marker = "--- Risposta ChatGPT ---";
+        let chatGptResponse = scraperOutput;
+        if (scraperOutput.includes(marker)) {
+          chatGptResponse = scraperOutput.split(marker)[1].trim();
         }
-      } else {
-        res.write(`data: ${JSON.stringify({ type: 'error', msg: `File di report non generato.` })}\n\n`);
+
+        if (!chatGptResponse || chatGptResponse.trim().length < 50) {
+          res.write(`data: ${JSON.stringify({ type: 'error', msg: `Nessuna risposta valida ricevuta da ChatGPT. Controlla che la sessione sia attiva.` })}\n\n`);
+          res.end();
+          return;
+        }
+
+        const parsedData = parseReport(chatGptResponse, ticker.trim().toUpperCase(), info.company);
+        res.write(`data: ${JSON.stringify({ type: 'data', data: parsedData })}\n\n`);
+      } catch (err) {
+        res.write(`data: ${JSON.stringify({ type: 'error', msg: `Errore parsing report: ${err.message}` })}\n\n`);
       }
+
       res.end();
     });
 
