@@ -1396,6 +1396,9 @@ export default function App() {
                           )}
                         </div>
                       </div>
+                    </div>
+                  );
+                })()}
 
                 {/* NOTIZIE ULTIME 3 GIORNI */}
                 <div className="card">
