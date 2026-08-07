@@ -141,6 +141,7 @@ export default function App() {
   const [newTickersInput, setNewTickersInput] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [logs, setLogs] = useState([]);
+  const [sortOrder, setSortOrder] = useState('none'); // 'none', 'desc' (dall'alto al basso), 'asc' (dal basso all'alto)
 
   useEffect(() => {
     localStorage.setItem('watchlist_tickers', JSON.stringify(watchlist));
@@ -463,6 +464,21 @@ export default function App() {
     };
   });
 
+  // Ordinamento dinamico per score
+  const sortedWatchlistRows = [...watchlistRows].sort((a, b) => {
+    if (sortOrder === 'desc') {
+      const scoreA = a.score !== null ? a.score : -1;
+      const scoreB = b.score !== null ? b.score : -1;
+      return scoreB - scoreA;
+    }
+    if (sortOrder === 'asc') {
+      const scoreA = a.score !== null ? a.score : 999;
+      const scoreB = b.score !== null ? b.score : 999;
+      return scoreA - scoreB;
+    }
+    return 0;
+  });
+
   return (
     <div className="container">
       <header>
@@ -533,9 +549,31 @@ export default function App() {
       {/* ── WATCHLIST TABLE ── */}
       <div className="watchlist-card">
         <div className="watchlist-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <div>
-            <span className="watchlist-title">📊 Watchlist — Sentiment Overview</span>
-            <span className="watchlist-sub">{watchlist.length} titoli nella tua lista monitorata</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+            <div>
+              <span className="watchlist-title">📊 Watchlist — Sentiment Overview</span>
+              <span className="watchlist-sub">{watchlist.length} titoli nella tua lista monitorata</span>
+            </div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Ordinamento:</span>
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                style={{
+                  background: 'rgba(30,41,59,0.9)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  color: '#f8fafc',
+                  padding: '0.3rem 0.6rem',
+                  borderRadius: '6px',
+                  fontSize: '0.78rem',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="none">Default (Ordine Watchlist)</option>
+                <option value="desc">Score: Più Alto ➔ Più Basso ⬇️</option>
+                <option value="asc">Score: Più Basso ➔ Più Alto ⬆️</option>
+              </select>
+            </div>
           </div>
           <button
             className="btn-primary"
@@ -559,11 +597,17 @@ export default function App() {
             <span>Titolo</span>
             <span>Mercato</span>
             <span>Sentiment</span>
-            <span>Score</span>
+            <span
+              onClick={() => setSortOrder(prev => prev === 'none' ? 'desc' : prev === 'desc' ? 'asc' : 'none')}
+              style={{ cursor: 'pointer', userSelect: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+              title="Clicca per ordinare per Score"
+            >
+              Score {sortOrder === 'desc' ? '⬇️' : sortOrder === 'asc' ? '⬆️' : '↕️'}
+            </span>
             <span>Impatto</span>
             <span>Azione</span>
           </div>
-          {watchlistRows.map((row) => {
+          {sortedWatchlistRows.map((row) => {
             const isActive = data?.search_metadata?.ticker === row.ticker;
             return (
               <div
