@@ -210,6 +210,21 @@ export default function App() {
     } catch (e) {}
   }, [watchlists]);
 
+  // ── Caricamento Storico Prezzi per l'ispezione interattiva Mouse Hover ──
+  useEffect(() => {
+    const activeTicker = query || data?.search_metadata?.ticker;
+    if (activeTicker) {
+      fetch(`http://localhost:3001/api/chart-history?ticker=${activeTicker}&period=${chartTimeframe}`)
+        .then(res => res.json())
+        .then(bars => {
+          if (Array.isArray(bars)) {
+            setChartHistoryBars(bars);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [query, data?.search_metadata?.ticker, chartTimeframe]);
+
   useEffect(() => {
     localStorage.setItem('active_watchlist_name', activeWatchlistName);
   }, [activeWatchlistName]);
@@ -1151,20 +1166,6 @@ export default function App() {
                 {(() => {
                   const chartData = realTickerData[query + '_CHART'] || realTickerData[data.search_metadata.ticker + '_CHART'];
                   const cta = chartData?.chart_technical_analysis;
-                  
-                  // Fetch chart history for interactive hover inspection
-                  useEffect(() => {
-                    if (data?.search_metadata?.ticker) {
-                      fetch(`http://localhost:3001/api/chart-history?ticker=${data.search_metadata.ticker}&period=${chartTimeframe}`)
-                        .then(res => res.json())
-                        .then(bars => {
-                          if (Array.isArray(bars)) {
-                            setChartHistoryBars(bars);
-                          }
-                        })
-                        .catch(() => {});
-                    }
-                  }, [data?.search_metadata?.ticker, chartTimeframe]);
 
                   // Pick chart image file according to indicator tab selected
                   let chartSuffix = 'price_alligator.png';
