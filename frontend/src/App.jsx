@@ -173,8 +173,10 @@ export default function App() {
   const [chartIndicatorTab, setChartIndicatorTab] = useState('prezzo');
   const [chartHistoryBars, setChartHistoryBars] = useState([]);
   const [hoveredBarIndex, setHoveredBarIndex] = useState(null);
+  const [hoveredBar, setHoveredBar] = useState(null);
   const [crosshairPos, setCrosshairPos] = useState(null);
   const [clickedBar, setClickedBar] = useState(null);
+  const [chartVersion, setChartVersion] = useState(Date.now());
 
   // ── Sincronizzazione con Server Backend (per la persistenza multi-browser) ──
   useEffect(() => {
@@ -211,20 +213,35 @@ export default function App() {
     } catch (e) {}
   }, [watchlists]);
 
-  // ── Caricamento Storico Prezzi per l'ispezione interattiva Mouse Hover ──
+  // ── Helper Timeframe config per yfinance & numero di barre ──
+  const getTimeframeConfig = (tf) => {
+    switch (tf) {
+      case '5g': return { period: '5d', days: 5 };
+      case '1m': return { period: '1mo', days: 22 };
+      case '3m': return { period: '3mo', days: 65 };
+      case '6m': return { period: '6mo', days: 130 };
+      case '1a': return { period: '1y', days: 70 };
+      case '2a': return { period: '2y', days: 500 };
+      default: return { period: '1y', days: 70 };
+    }
+  };
+
+  // ── Caricamento Storico Prezzi ed ispezione interattiva Mouse Hover ──
   useEffect(() => {
     const activeTicker = query || data?.search_metadata?.ticker;
     if (activeTicker) {
-      fetch(`http://localhost:3001/api/chart-history?ticker=${activeTicker}&period=${chartTimeframe}`)
+      const cfg = getTimeframeConfig(chartTimeframe);
+      fetch(`http://localhost:3001/api/chart-history?ticker=${activeTicker}&period=${cfg.period}&days=${cfg.days}&chart_type=${chartType}`)
         .then(res => res.json())
         .then(bars => {
           if (Array.isArray(bars)) {
             setChartHistoryBars(bars);
+            setChartVersion(Date.now());
           }
         })
         .catch(() => {});
     }
-  }, [query, data?.search_metadata?.ticker, chartTimeframe]);
+  }, [query, data?.search_metadata?.ticker, chartTimeframe, chartType]);
 
   useEffect(() => {
     localStorage.setItem('active_watchlist_name', activeWatchlistName);
@@ -1170,26 +1187,27 @@ export default function App() {
 
                   const ticker = data.search_metadata.ticker;
                   const baseUrl = `http://localhost:3001/finance_charts/${ticker}_`;
+                  const ver = `?v=${chartVersion}`;
                   
                   let chartList = [];
                   if (chartIndicatorTab === 'tutti') {
                     chartList = [
-                      { id: 'price', title: '📈 1. Prezzo & Livelli (Candele / Alligator / Supporti & Trigger)', url: `${baseUrl}price_alligator.png` },
-                      { id: 'volume', title: '📊 2. Analisi Volumi & Medie Mobili (Vol MA5 & MA10)', url: `${baseUrl}volume.png` },
-                      { id: 'rsi', title: '📉 3. Oscillatori Momentum (RSI, Stochastic & Williams %R)', url: `${baseUrl}oscillators.png` },
-                      { id: 'macd', title: '📊 4. Trend Follower MACD (MACD, Signal & Istogramma)', url: `${baseUrl}macd.png` },
-                      { id: 'adx', title: '📈 5. Indicatori ADX & Direzionali Trend (ADX, DI+, DI-)', url: `${baseUrl}adx.png` },
+                      { id: 'price', title: '📈 1. Prezzo & Livelli (Candele / Alligator / Supporti & Trigger)', url: `${baseUrl}price_alligator.png${ver}` },
+                      { id: 'volume', title: '📊 2. Analisi Volumi & Medie Mobili (Vol MA5 & MA10)', url: `${baseUrl}volume.png${ver}` },
+                      { id: 'rsi', title: '📉 3. Oscillatori Momentum (RSI, Stochastic & Williams %R)', url: `${baseUrl}oscillators.png${ver}` },
+                      { id: 'macd', title: '📊 4. Trend Follower MACD (MACD, Signal & Istogramma)', url: `${baseUrl}macd.png${ver}` },
+                      { id: 'adx', title: '📈 5. Indicatori ADX & Direzionali Trend (ADX, DI+, DI-)', url: `${baseUrl}adx.png${ver}` },
                     ];
                   } else if (chartIndicatorTab === 'prezzo') {
-                    chartList = [{ id: 'price', title: '📈 Prezzo & Livelli (Candele / Alligator / Supporti & Trigger)', url: `${baseUrl}price_alligator.png` }];
+                    chartList = [{ id: 'price', title: '📈 Prezzo & Livelli (Candele / Alligator / Supporti & Trigger)', url: `${baseUrl}price_alligator.png${ver}` }];
                   } else if (chartIndicatorTab === 'volumi') {
-                    chartList = [{ id: 'volume', title: '📊 Analisi Volumi & Medie Mobili (Vol MA5 & MA10)', url: `${baseUrl}volume.png` }];
+                    chartList = [{ id: 'volume', title: '📊 Analisi Volumi & Medie Mobili (Vol MA5 & MA10)', url: `${baseUrl}volume.png${ver}` }];
                   } else if (chartIndicatorTab === 'rsi') {
-                    chartList = [{ id: 'rsi', title: '📉 Oscillatori Momentum (RSI, Stochastic & Williams %R)', url: `${baseUrl}oscillators.png` }];
+                    chartList = [{ id: 'rsi', title: '📉 Oscillatori Momentum (RSI, Stochastic & Williams %R)', url: `${baseUrl}oscillators.png${ver}` }];
                   } else if (chartIndicatorTab === 'macd') {
-                    chartList = [{ id: 'macd', title: '📊 Trend Follower MACD (MACD, Signal & Istogramma)', url: `${baseUrl}macd.png` }];
+                    chartList = [{ id: 'macd', title: '📊 Trend Follower MACD (MACD, Signal & Istogramma)', url: `${baseUrl}macd.png${ver}` }];
                   } else if (chartIndicatorTab === 'adx') {
-                    chartList = [{ id: 'adx', title: '📈 Indicatori ADX & Direzionali Trend (ADX, DI+, DI-)', url: `${baseUrl}adx.png` }];
+                    chartList = [{ id: 'adx', title: '📈 Indicatori ADX & Direzionali Trend (ADX, DI+, DI-)', url: `${baseUrl}adx.png${ver}` }];
                   }
 
                   // Levels strictly come from Vision AI run (cta). If no run executed yet, prompt user.
@@ -1201,8 +1219,8 @@ export default function App() {
                     ? new Date(data.search_metadata.timestamp_utc).toISOString().split('T')[0]
                     : new Date().toISOString().split('T')[0];
 
-                  const activeBar = (hoveredBarIndex !== null && chartHistoryBars[hoveredBarIndex])
-                    ? chartHistoryBars[hoveredBarIndex]
+                  const activeBar = hoveredBar
+                    ? hoveredBar
                     : (clickedBar
                       ? clickedBar
                       : (chartHistoryBars.length > 0 ? chartHistoryBars[chartHistoryBars.length - 1] : null));
@@ -1220,7 +1238,7 @@ export default function App() {
                     if (chartHistoryBars && chartHistoryBars.length > 0) {
                       const plotPct = Math.min(Math.max(0, (pct - 0.075) / 0.765), 1);
                       const idx = Math.min(Math.max(0, Math.round(plotPct * (chartHistoryBars.length - 1))), chartHistoryBars.length - 1);
-                      setHoveredBarIndex(idx);
+                      setHoveredBar(chartHistoryBars[idx]);
                     }
                   };
 
@@ -1237,7 +1255,7 @@ export default function App() {
 
                   const handleMouseLeave = () => {
                     setCrosshairPos(null);
-                    setHoveredBarIndex(null);
+                    setHoveredBar(null);
                   };
 
                   return (
