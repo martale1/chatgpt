@@ -217,9 +217,6 @@ Regole:
 - Includi notizie storiche rilevanti degli ultimi 30 giorni in latest_available_news."""
 
 
-DEFAULT_PROMPT = build_stock_prompt(DEFAULT_COMPANY, DEFAULT_TICKER, DEFAULT_MARKET)
-
-
 
 def parse_stock_list(value):
     if not value:
