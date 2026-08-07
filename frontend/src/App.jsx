@@ -174,6 +174,7 @@ export default function App() {
   const [chartHistoryBars, setChartHistoryBars] = useState([]);
   const [hoveredBarIndex, setHoveredBarIndex] = useState(null);
   const [crosshairPos, setCrosshairPos] = useState(null);
+  const [clickedBar, setClickedBar] = useState(null);
 
   // ── Sincronizzazione con Server Backend (per la persistenza multi-browser) ──
   useEffect(() => {
@@ -1185,9 +1186,11 @@ export default function App() {
                     ? new Date(data.search_metadata.timestamp_utc).toISOString().split('T')[0]
                     : new Date().toISOString().split('T')[0];
 
-                  const activeBar = (hoveredBarIndex !== null && chartHistoryBars[hoveredBarIndex])
-                    ? chartHistoryBars[hoveredBarIndex]
-                    : (chartHistoryBars.length > 0 ? chartHistoryBars[chartHistoryBars.length - 1] : null);
+                  const activeBar = clickedBar
+                    ? clickedBar
+                    : ((hoveredBarIndex !== null && chartHistoryBars[hoveredBarIndex])
+                      ? chartHistoryBars[hoveredBarIndex]
+                      : (chartHistoryBars.length > 0 ? chartHistoryBars[chartHistoryBars.length - 1] : null));
 
                   const displayDate = activeBar ? activeBar.date : dateStr;
                   const displayClose = activeBar ? `${activeBar.close} €` : (typeof currentClose === 'number' ? `${currentClose} €` : currentClose);
@@ -1202,6 +1205,16 @@ export default function App() {
                     if (chartHistoryBars && chartHistoryBars.length > 0) {
                       const idx = Math.min(Math.max(0, Math.floor(pct * chartHistoryBars.length)), chartHistoryBars.length - 1);
                       setHoveredBarIndex(idx);
+                    }
+                  };
+
+                  const handleChartClick = (e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const pct = x / rect.width;
+                    if (chartHistoryBars && chartHistoryBars.length > 0) {
+                      const idx = Math.min(Math.max(0, Math.floor(pct * chartHistoryBars.length)), chartHistoryBars.length - 1);
+                      setClickedBar(chartHistoryBars[idx]);
                     }
                   };
 
@@ -1340,6 +1353,7 @@ export default function App() {
                         <div
                           onMouseMove={handleMouseMove}
                           onMouseLeave={handleMouseLeave}
+                          onClick={handleChartClick}
                           style={{ position: 'relative', width: '100%', background: '#ffffff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', minHeight: '320px', cursor: 'crosshair' }}
                         >
                           {/* Vertical Crosshair Line on Mouse Hover */}
@@ -1358,7 +1372,7 @@ export default function App() {
                             />
                           )}
 
-                          <a href={chartImageUrl} target="_blank" rel="noreferrer">
+                          <a href={chartImageUrl} target="_blank" rel="noreferrer" onClick={(e) => e.preventDefault()}>
                             <img
                               src={chartImageUrl}
                               alt={`Grafico ${data.search_metadata.ticker}`}
@@ -1428,6 +1442,31 @@ export default function App() {
                           </div>
                         </div>
                       </div>
+
+                      {/* FOOTER INSPECTION NOTE (REPORTED WHEN USER CLICKS A BAR) */}
+                      {clickedBar ? (
+                        <div style={{ marginTop: '0.8rem', padding: '0.75rem 1rem', background: '#eff6ff', borderRadius: '10px', border: '1px solid #93c5fd', color: '#1e3a8a', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
+                          <div style={{ fontSize: '0.84rem' }}>
+                            <strong style={{ color: '#1d4ed8', fontSize: '0.9rem' }}>📌 Nota Ispezione Barra del {clickedBar.date}:</strong> &nbsp;
+                            <span>Chiusura: <strong>{clickedBar.close} €</strong> &nbsp;|&nbsp; </span>
+                            <span>Apertura: <strong>{clickedBar.open} €</strong> &nbsp;|&nbsp; </span>
+                            <span>Massimo: <strong>{clickedBar.high} €</strong> &nbsp;|&nbsp; </span>
+                            <span>Minimo: <strong>{clickedBar.low} €</strong> &nbsp;|&nbsp; </span>
+                            <span>Variazione 1D: <strong style={{ color: clickedBar.change_pct >= 0 ? '#15803d' : '#b91c1c' }}>{clickedBar.change_pct >= 0 ? '+' : ''}{clickedBar.change_pct}%</strong> &nbsp;|&nbsp; </span>
+                            <span>Volumi: <strong>{clickedBar.volume?.toLocaleString('it-IT') || '—'}</strong></span>
+                          </div>
+                          <button
+                            onClick={() => setClickedBar(null)}
+                            style={{ background: '#ffffff', border: '1px solid #93c5fd', color: '#1e40af', padding: '0.25rem 0.6rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}
+                          >
+                            ✕ Sblocca
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: '0.6rem', fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic' }}>
+                          💡 <em>Fai click su qualsiasi candela del grafico per fissare i dati di quel giorno nella nota a piè di pagina.</em>
+                        </div>
+                      )}
 
                       {/* CHATGPT VISION & TECHNICAL ANALYSIS DETAILS CARD */}
                       <div style={{ marginTop: '1.2rem', padding: '1rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
