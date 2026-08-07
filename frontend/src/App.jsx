@@ -1503,6 +1503,19 @@ export default function App() {
                           </div>
 
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.9rem', fontSize: '0.84rem', color: '#334155' }}>
+                            {/* 1. SCENARIO PRINCIPALE (IN TESTA AL BOX) */}
+                            {cta.key_scenario && (
+                              <div style={{ gridColumn: '1 / -1', background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #cbd5e1', boxShadow: '0 2px 5px rgba(0,0,0,0.03)' }}>
+                                <strong style={{ color: '#15803d', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                  🎯 Scenario Principale Grafico AI:
+                                </strong>
+                                <div style={{ marginTop: '6px', color: '#0f172a', lineHeight: 1.55, fontSize: '0.88rem' }}>
+                                  {cta.key_scenario}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 2. SUPPORTI E RESISTENZE / TRIGGER */}
                             <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', borderLeft: '4px solid #16a34a', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                               <strong style={{ color: '#16a34a' }}>🟢 Supporti Grafici (Vision S1, S2):</strong>
                               <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
@@ -1517,6 +1530,7 @@ export default function App() {
                               </div>
                             </div>
 
+                            {/* 3. PATTERN CANDELE, VOLUMI, RSI & MACD */}
                             {cta.candlestick_pattern && (
                               <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                                 <strong style={{ color: '#a855f7' }}>🕯️ Pattern Candele:</strong>
@@ -1538,15 +1552,7 @@ export default function App() {
                               </div>
                             )}
 
-                            {cta.key_scenario && (
-                              <div style={{ gridColumn: '1 / -1', background: '#ffffff', padding: '0.8rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                                <strong style={{ color: '#15803d' }}>🎯 Scenario Principale Grafico AI:</strong>
-                                <div style={{ marginTop: '4px', color: '#0f172a', lineHeight: 1.5 }}>
-                                  {cta.key_scenario}
-                                </div>
-                              </div>
-                            )}
-
+                            {/* 4. NOTA OPERATIVA PRUDENTE */}
                             {cta.operational_note && (
                               <div style={{ gridColumn: '1 / -1', fontStyle: 'italic', color: '#475569', background: '#f1f5f9', padding: '0.6rem 0.8rem', borderRadius: '8px' }}>
                                 💡 <strong>Nota Operativa Prudente:</strong> {cta.operational_note}
