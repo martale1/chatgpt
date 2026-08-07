@@ -1324,7 +1324,20 @@ export default function App() {
 
                       </div>
 
-                      {/* MAIN CHART IMAGE DISPLAY WITH CROSSHAIR HOVER & OVERLAY VALUES */}
+                      {/* IDENTIFIED LEVELS STATUS BAR ABOVE CHART IMAGE (CLEAN & NON-OVERLAPPING) */}
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.7rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '0.25rem 0.65rem', borderRadius: '6px' }}>
+                          🔵 PREZZO {currentClose}
+                        </div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', padding: '0.25rem 0.65rem', borderRadius: '6px' }}>
+                          🔴 TRIGGER {triggerPrice}
+                        </div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '0.25rem 0.65rem', borderRadius: '6px' }}>
+                          🟢 SUPPORTO {supportPrice}
+                        </div>
+                      </div>
+
+                      {/* MAIN CHART IMAGE DISPLAY WITH CROSSHAIR HOVER */}
                       <div
                         onMouseMove={handleMouseMove}
                         onMouseLeave={handleMouseLeave}
@@ -1345,19 +1358,6 @@ export default function App() {
                             }}
                           />
                         )}
-
-                        {/* Identified Levels Overlay Badges (Matching Screenshot) */}
-                        <div style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 10, display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'right', pointerEvents: 'none' }}>
-                          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#2563eb', background: 'rgba(255,255,255,0.92)', padding: '3px 8px', borderRadius: '5px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', borderLeft: '4px solid #2563eb' }}>
-                            🔵 PREZZO {currentClose}
-                          </div>
-                          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#dc2626', background: 'rgba(255,255,255,0.92)', padding: '3px 8px', borderRadius: '5px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', borderLeft: '4px solid #dc2626' }}>
-                            🔴 TRIGGER {triggerPrice}
-                          </div>
-                          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#16a34a', background: 'rgba(255,255,255,0.92)', padding: '3px 8px', borderRadius: '5px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', borderLeft: '4px solid #16a34a' }}>
-                            🟢 SUPPORTO {supportPrice}
-                          </div>
-                        </div>
 
                         <a href={chartImageUrl} target="_blank" rel="noreferrer">
                           <img
