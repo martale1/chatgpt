@@ -1398,8 +1398,13 @@ export default function App() {
                                   alt={chartItem.title}
                                   style={{ width: '100%', display: 'block', minHeight: '260px', objectFit: 'contain' }}
                                   onError={(e) => {
-                                    e.target.onerror = null;
-                                    e.target.style.display = 'none';
+                                    const fallbackUrl = `http://localhost:3001/finance_charts/${ticker}_momentum.png`;
+                                    const priceUrl = `http://localhost:3001/finance_charts/${ticker}_price_alligator.png`;
+                                    if (e.target.src !== fallbackUrl && e.target.src !== priceUrl) {
+                                      e.target.src = fallbackUrl;
+                                    } else if (e.target.src === fallbackUrl) {
+                                      e.target.src = priceUrl;
+                                    }
                                   }}
                                 />
                               </div>

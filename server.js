@@ -254,6 +254,12 @@ const server = http.createServer((req, meRes) => {
 
     const pythonCmd = `
 import json, yfinance as yf
+from finance_charts.technical_charts import create_chart_bundle
+try:
+    create_chart_bundle('${ticker}', 'finance_charts', period='${period}', days=${days})
+except Exception:
+    pass
+
 df = yf.Ticker('${ticker}').history(period='${period}').tail(${days})
 bars = []
 for date, row in df.iterrows():
