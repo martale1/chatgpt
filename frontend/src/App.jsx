@@ -1520,7 +1520,14 @@ export default function App() {
                               </div>
                             )}
 
-                            {/* 2. SUPPORTI E RESISTENZE / TRIGGER */}
+                            {/* 2. NOTA OPERATIVA PRUDENTE (SUBITO SOTTO SCENARIO PRINCIPALE) */}
+                            {cta.operational_note && (
+                              <div style={{ gridColumn: '1 / -1', fontStyle: 'italic', color: '#334155', background: '#eff6ff', padding: '0.65rem 0.9rem', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+                                💡 <strong style={{ color: '#1d4ed8' }}>Nota Operativa Prudente:</strong> {cta.operational_note}
+                              </div>
+                            )}
+
+                            {/* 3. SUPPORTI E RESISTENZE / TRIGGER */}
                             <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', borderLeft: '4px solid #16a34a', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                               <strong style={{ color: '#16a34a' }}>🟢 Supporti Grafici (Vision S1, S2):</strong>
                               <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
@@ -1535,7 +1542,7 @@ export default function App() {
                               </div>
                             </div>
 
-                            {/* 3. PATTERN CANDELE, VOLUMI, RSI & MACD */}
+                            {/* 4. PATTERN CANDELE, VOLUMI, RSI & MACD */}
                             {cta.candlestick_pattern && (
                               <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                                 <strong style={{ color: '#a855f7' }}>🕯️ Pattern Candele:</strong>
@@ -1554,13 +1561,6 @@ export default function App() {
                               <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                                 <strong style={{ color: '#0284c7' }}>📉 RSI &amp; MACD:</strong>
                                 <div style={{ marginTop: '2px', color: '#1e293b' }}>{cta.rsi_macd_summary}</div>
-                              </div>
-                            )}
-
-                            {/* 4. NOTA OPERATIVA PRUDENTE */}
-                            {cta.operational_note && (
-                              <div style={{ gridColumn: '1 / -1', fontStyle: 'italic', color: '#475569', background: '#f1f5f9', padding: '0.6rem 0.8rem', borderRadius: '8px' }}>
-                                💡 <strong>Nota Operativa Prudente:</strong> {cta.operational_note}
                               </div>
                             )}
                           </div>
