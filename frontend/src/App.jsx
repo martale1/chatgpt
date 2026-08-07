@@ -1201,10 +1201,10 @@ export default function App() {
                     ? new Date(data.search_metadata.timestamp_utc).toISOString().split('T')[0]
                     : new Date().toISOString().split('T')[0];
 
-                  const activeBar = clickedBar
-                    ? clickedBar
-                    : ((hoveredBarIndex !== null && chartHistoryBars[hoveredBarIndex])
-                      ? chartHistoryBars[hoveredBarIndex]
+                  const activeBar = (hoveredBarIndex !== null && chartHistoryBars[hoveredBarIndex])
+                    ? chartHistoryBars[hoveredBarIndex]
+                    : (clickedBar
+                      ? clickedBar
                       : (chartHistoryBars.length > 0 ? chartHistoryBars[chartHistoryBars.length - 1] : null));
 
                   const displayDate = activeBar ? activeBar.date : dateStr;
@@ -1218,7 +1218,7 @@ export default function App() {
                     const pct = x / rect.width;
                     setCrosshairPos(x);
                     if (chartHistoryBars && chartHistoryBars.length > 0) {
-                      const plotPct = Math.min(Math.max(0, (pct - 0.08) / 0.84), 1);
+                      const plotPct = Math.min(Math.max(0, (pct - 0.075) / 0.765), 1);
                       const idx = Math.min(Math.max(0, Math.round(plotPct * (chartHistoryBars.length - 1))), chartHistoryBars.length - 1);
                       setHoveredBarIndex(idx);
                     }
@@ -1229,7 +1229,7 @@ export default function App() {
                     const x = e.clientX - rect.left;
                     const pct = x / rect.width;
                     if (chartHistoryBars && chartHistoryBars.length > 0) {
-                      const plotPct = Math.min(Math.max(0, (pct - 0.08) / 0.84), 1);
+                      const plotPct = Math.min(Math.max(0, (pct - 0.075) / 0.765), 1);
                       const idx = Math.min(Math.max(0, Math.round(plotPct * (chartHistoryBars.length - 1))), chartHistoryBars.length - 1);
                       setClickedBar(chartHistoryBars[idx]);
                     }
