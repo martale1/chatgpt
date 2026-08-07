@@ -232,7 +232,7 @@ const server = http.createServer((req, meRes) => {
     return;
   }
 
-  if (parsedUrl.pathname === '/api/analyze-stock' && req.method === 'GET') {
+  if ((parsedUrl.pathname === '/api/analyze' || parsedUrl.pathname === '/api/analyze-stock') && req.method === 'GET') {
     const res = meRes;
     const ticker = parsedUrl.query.ticker || 'VOD.L';
     const info = getCompanyInfo(ticker);
