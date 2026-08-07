@@ -1168,14 +1168,27 @@ export default function App() {
                   const chartData = realTickerData[query + '_CHART'] || realTickerData[data.search_metadata.ticker + '_CHART'];
                   const cta = chartData?.chart_technical_analysis;
 
-                  // Pick chart image file according to indicator tab selected
-                  let chartSuffix = 'price_alligator.png';
-                  if (chartIndicatorTab === 'volumi' || chartIndicatorTab === 'rsi') {
-                    chartSuffix = 'momentum.png';
-                  } else if (chartIndicatorTab === 'macd' || chartIndicatorTab === 'adx') {
-                    chartSuffix = 'adx.png';
+                  const ticker = data.search_metadata.ticker;
+                  const baseUrl = `http://localhost:3001/finance_charts/${ticker}_`;
+                  
+                  let chartList = [];
+                  if (chartIndicatorTab === 'tutti') {
+                    chartList = [
+                      { id: 'price', title: '📈 Prezzo & Livelli Alligator (Supporti / Trigger)', url: `${baseUrl}price_alligator.png` },
+                      { id: 'momentum', title: '📊 Dashboard Volumi & Momentum (RSI, Stoch, MACD)', url: `${baseUrl}momentum.png` },
+                      { id: 'adx', title: '📉 Dashboard ADX & Forza del Trend (DI+ / DI-)', url: `${baseUrl}adx.png` },
+                    ];
+                  } else if (chartIndicatorTab === 'prezzo') {
+                    chartList = [{ id: 'price', title: '📈 Prezzo & Livelli Alligator (Supporti / Trigger)', url: `${baseUrl}price_alligator.png` }];
+                  } else if (chartIndicatorTab === 'volumi') {
+                    chartList = [{ id: 'momentum', title: '📊 Analisi Volumi (Volume + MA10/MA5)', url: `${baseUrl}momentum.png` }];
+                  } else if (chartIndicatorTab === 'rsi') {
+                    chartList = [{ id: 'momentum', title: '📉 Oscillatori Momentum (RSI, Stoch, Williams %R)', url: `${baseUrl}momentum.png` }];
+                  } else if (chartIndicatorTab === 'macd') {
+                    chartList = [{ id: 'momentum', title: '📊 Trend Follower MACD (MACD, Signal, Istogramma)', url: `${baseUrl}momentum.png` }];
+                  } else if (chartIndicatorTab === 'adx') {
+                    chartList = [{ id: 'adx', title: '📈 ADX & Direzionali Trend (ADX, DI+, DI-)', url: `${baseUrl}adx.png` }];
                   }
-                  const chartImageUrl = `http://localhost:3001/finance_charts/${data.search_metadata.ticker}_${chartSuffix}`;
 
                   // Levels strictly come from Vision AI run (cta). If no run executed yet, prompt user.
                   const currentClose = cta?.identified_levels?.current_price || data.search_metadata?.current_market_price || '—';
@@ -1203,7 +1216,8 @@ export default function App() {
                     const pct = x / rect.width;
                     setCrosshairPos(x);
                     if (chartHistoryBars && chartHistoryBars.length > 0) {
-                      const idx = Math.min(Math.max(0, Math.floor(pct * chartHistoryBars.length)), chartHistoryBars.length - 1);
+                      const plotPct = Math.min(Math.max(0, (pct - 0.08) / 0.84), 1);
+                      const idx = Math.min(Math.max(0, Math.round(plotPct * (chartHistoryBars.length - 1))), chartHistoryBars.length - 1);
                       setHoveredBarIndex(idx);
                     }
                   };
@@ -1213,7 +1227,8 @@ export default function App() {
                     const x = e.clientX - rect.left;
                     const pct = x / rect.width;
                     if (chartHistoryBars && chartHistoryBars.length > 0) {
-                      const idx = Math.min(Math.max(0, Math.floor(pct * chartHistoryBars.length)), chartHistoryBars.length - 1);
+                      const plotPct = Math.min(Math.max(0, (pct - 0.08) / 0.84), 1);
+                      const idx = Math.min(Math.max(0, Math.round(plotPct * (chartHistoryBars.length - 1))), chartHistoryBars.length - 1);
                       setClickedBar(chartHistoryBars[idx]);
                     }
                   };
@@ -1348,41 +1363,46 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* MAIN CHART IMAGE DISPLAY WITH CROSSHAIR HOVER OR PLACEHOLDER */}
+                      {/* MAIN CHART IMAGES DISPLAY (STACKED IF 'TUTTI' IS SELECTED) */}
                       {cta ? (
-                        <div
-                          onMouseMove={handleMouseMove}
-                          onMouseLeave={handleMouseLeave}
-                          onClick={handleChartClick}
-                          style={{ position: 'relative', width: '100%', background: '#ffffff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', minHeight: '320px', cursor: 'crosshair' }}
-                        >
-                          {/* Vertical Crosshair Line on Mouse Hover */}
-                          {crosshairPos !== null && (
-                            <div
-                              style={{
-                                position: 'absolute',
-                                top: 0,
-                                bottom: 0,
-                                left: `${crosshairPos}px`,
-                                width: '1px',
-                                borderLeft: '1px dashed #64748b',
-                                pointerEvents: 'none',
-                                zIndex: 20
-                              }}
-                            />
-                          )}
-
-                          <a href={chartImageUrl} target="_blank" rel="noreferrer" onClick={(e) => e.preventDefault()}>
-                            <img
-                              src={chartImageUrl}
-                              alt={`Grafico ${data.search_metadata.ticker}`}
-                              style={{ width: '100%', display: 'block', minHeight: '300px', objectFit: 'contain' }}
-                              onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.style.display = 'none';
-                              }}
-                            />
-                          </a>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                          {chartList.map((chartItem) => (
+                            <div key={chartItem.id} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', background: '#ffffff' }}>
+                              <div style={{ padding: '0.5rem 0.8rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: '0.84rem', color: '#1e293b' }}>
+                                {chartItem.title}
+                              </div>
+                              <div
+                                onMouseMove={handleMouseMove}
+                                onMouseLeave={handleMouseLeave}
+                                onClick={handleChartClick}
+                                style={{ position: 'relative', width: '100%', cursor: 'crosshair' }}
+                              >
+                                {crosshairPos !== null && (
+                                  <div
+                                    style={{
+                                      position: 'absolute',
+                                      top: 0,
+                                      bottom: 0,
+                                      left: `${crosshairPos}px`,
+                                      width: '1px',
+                                      borderLeft: '1px dashed #64748b',
+                                      pointerEvents: 'none',
+                                      zIndex: 20
+                                    }}
+                                  />
+                                )}
+                                <img
+                                  src={chartItem.url}
+                                  alt={chartItem.title}
+                                  style={{ width: '100%', display: 'block', minHeight: '260px', objectFit: 'contain' }}
+                                  onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.style.display = 'none';
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       ) : (
                         <div style={{ padding: '2rem 1rem', textAlign: 'center', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
