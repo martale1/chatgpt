@@ -134,7 +134,7 @@ def _save(fig, path):
     return path
 
 
-def plot_price_alligator(df, ticker, output_path, days=70, chart_type="candlestick"):
+def plot_price_alligator(df, ticker, output_path, days=252, chart_type="candlestick"):
     view = df.tail(days).copy()
     x = _date_positions(view)
     fig, ax = plt.subplots(figsize=(15, 6))
@@ -167,7 +167,7 @@ def plot_price_alligator(df, ticker, output_path, days=70, chart_type="candlesti
     ax.axhline(support_level, color="#16a34a", linestyle="--", linewidth=1.8, alpha=0.9)
     ax.text(x[-1] + 0.5, support_level, f"  SUPPORTO {support_level:.2f}", color="#16a34a", fontweight="bold", fontsize=10, va="center")
 
-    ax.set_title(f"{ticker} - Price & Levels (last {len(view)} bars)")
+    ax.set_title(f"{ticker} - Price & Levels ({len(view)} sessioni)", fontweight="bold")
     ax.set_ylabel("Price (€ / $)")
     ax.grid(True, alpha=0.25)
     ax.legend(loc="upper left", ncol=3)
@@ -175,7 +175,7 @@ def plot_price_alligator(df, ticker, output_path, days=70, chart_type="candlesti
     return _save(fig, output_path)
 
 
-def plot_volume(df, ticker, output_path, days=70):
+def plot_volume(df, ticker, output_path, days=252):
     view = df.tail(days).copy()
     x = _date_positions(view)
     fig, ax = plt.subplots(figsize=(15, 4.5))
@@ -184,7 +184,7 @@ def plot_volume(df, ticker, output_path, days=70):
     ax.bar(x, view["Volume"], color=colors, alpha=0.8, label="Volume")
     ax.plot(x, view["Vol_MA10"], color="#2563eb", linewidth=1.8, label="Vol MA10")
     ax.plot(x, view["Vol_MA5"], color="#f97316", linewidth=1.8, label="Vol MA5")
-    ax.set_title(f"{ticker} - Volume & Moving Averages")
+    ax.set_title(f"{ticker} - Volume & Moving Averages ({len(view)} sessioni)", fontweight="bold")
     ax.set_ylabel("Volume")
     ax.grid(True, alpha=0.25)
     ax.legend(loc="upper left")
@@ -192,7 +192,7 @@ def plot_volume(df, ticker, output_path, days=70):
     return _save(fig, output_path)
 
 
-def plot_oscillators(df, ticker, output_path, days=70):
+def plot_oscillators(df, ticker, output_path, days=252):
     view = df.tail(days).copy()
     x = _date_positions(view)
     fig, ax = plt.subplots(figsize=(15, 4.5))
@@ -206,7 +206,7 @@ def plot_oscillators(df, ticker, output_path, days=70):
     ax_w = ax.twinx()
     ax_w.plot(x, view["Williams_R"], color="#38bdf8", linewidth=1.5, label="Williams %R")
     ax_w.set_ylim(-105, 5)
-    ax.set_title(f"{ticker} - RSI, Stochastic & Williams %R")
+    ax.set_title(f"{ticker} - RSI, Stochastic & Williams %R ({len(view)} sessioni)", fontweight="bold")
     ax.set_ylabel("RSI / Stoch")
     ax_w.set_ylabel("Williams %R")
     h1, l1 = ax.get_legend_handles_labels()
@@ -217,7 +217,7 @@ def plot_oscillators(df, ticker, output_path, days=70):
     return _save(fig, output_path)
 
 
-def plot_macd(df, ticker, output_path, days=70):
+def plot_macd(df, ticker, output_path, days=252):
     view = df.tail(days).copy()
     x = _date_positions(view)
     fig, ax = plt.subplots(figsize=(15, 4.5))
@@ -226,7 +226,7 @@ def plot_macd(df, ticker, output_path, days=70):
     ax.plot(x, view["MACD"], color="blue", linewidth=1.8, label="MACD")
     ax.plot(x, view["MACD_Signal"], color="red", linewidth=1.8, label="Signal")
     ax.axhline(0, color="#374151", linestyle="--", linewidth=1, alpha=0.6)
-    ax.set_title(f"{ticker} - MACD / Signal / Histogram")
+    ax.set_title(f"{ticker} - MACD / Signal / Histogram ({len(view)} sessioni)", fontweight="bold")
     ax.set_ylabel("MACD Value")
     ax.grid(True, alpha=0.25)
     ax.legend(loc="upper left")
@@ -234,7 +234,7 @@ def plot_macd(df, ticker, output_path, days=70):
     return _save(fig, output_path)
 
 
-def plot_momentum_dashboard(df, ticker, output_path, days=70):
+def plot_momentum_dashboard(df, ticker, output_path, days=252):
     view = df.tail(days).copy()
     x = _date_positions(view)
     fig, axes = plt.subplots(3, 1, figsize=(15, 10), sharex=True)
@@ -278,7 +278,7 @@ def plot_momentum_dashboard(df, ticker, output_path, days=70):
     return _save(fig, output_path)
 
 
-def plot_adx_dashboard(df, ticker, output_path, days=70):
+def plot_adx_dashboard(df, ticker, output_path, days=252):
     view = df.tail(days).copy()
     x = _date_positions(view)
     fig, ax = plt.subplots(figsize=(15, 4.5))
@@ -287,7 +287,7 @@ def plot_adx_dashboard(df, ticker, output_path, days=70):
     ax.plot(x, view["ADX"], color="#16a34a", linewidth=2.2, label="ADX")
     ax.axhline(25, color="#ef4444", linestyle="--", linewidth=1, alpha=0.6)
     ax.text(x[-1], 25, " 25", va="center", fontsize=9)
-    ax.set_title(f"{ticker} - ADX & Directional Movement (DI+ / DI-)")
+    ax.set_title(f"{ticker} - ADX & Directional Movement (DI+ / DI-) ({len(view)} sessioni)", fontweight="bold")
     ax.set_ylabel("ADX / DI Value")
     ax.grid(True, alpha=0.3)
     ax.legend(loc="upper left")
@@ -336,7 +336,7 @@ def latest_snapshot(df):
     }
 
 
-def create_chart_bundle(ticker, output_dir, period="1y", days=70, chart_type="candlestick"):
+def create_chart_bundle(ticker, output_dir, period="1y", days=252, chart_type="candlestick"):
     output_dir = Path(output_dir)
     df = add_indicators(download_history(ticker, period=period))
     safe_ticker = ticker.replace("/", "_")
