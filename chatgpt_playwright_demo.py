@@ -45,24 +45,41 @@ def safe_print(*values):
     print(*values, flush=True)
 
 
+import concurrent.futures
 import yfinance as yf
 
 
-def get_live_market_data(ticker):
+def get_live_market_data(ticker, timeout_sec=2.5):
     if not ticker:
         return None
+    safe_print(f"Recupero prezzo live da Yahoo Finance per {ticker}...")
+
+    def _fetch():
+        try:
+            t = yf.Ticker(ticker.strip())
+            price = None
+            if hasattr(t, "fast_info"):
+                try:
+                    price = t.fast_info.get("lastPrice")
+                except Exception:
+                    pass
+            if price is None:
+                hist = t.history(period="1d")
+                if not hist.empty:
+                    price = float(hist["Close"].iloc[-1])
+            return round(float(price), 2) if price else None
+        except Exception:
+            return None
+
     try:
-        t = yf.Ticker(ticker.strip())
-        price = None
-        if hasattr(t, "fast_info") and "lastPrice" in t.fast_info:
-            price = t.fast_info["lastPrice"]
-        if price is None:
-            hist = t.history(period="5d")
-            if not hist.empty:
-                price = float(hist["Close"].iloc[-1])
-        return round(float(price), 2) if price else None
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_fetch)
+            res = future.result(timeout=timeout_sec)
+            if res:
+                safe_print(f"Prezzo Yahoo Finance per {ticker}: {res}")
+            return res
     except Exception as exc:
-        safe_print(f"Impossibile recuperare prezzo live yfinance per {ticker}: {exc}")
+        safe_print(f"Nota: timeout/skip prezzo yfinance per {ticker}")
         return None
 
 
