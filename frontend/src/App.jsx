@@ -523,12 +523,18 @@ export default function App() {
         })
       : null;
 
+    const currentPrice = d?.search_metadata?.current_market_price;
+    const analystTargets = d?.analyst_ratings_and_targets || [];
+    const bestUpsideItem = analystTargets.find(a => a.is_target_higher || (a.upside_percent > 0)) || analystTargets[0];
+
     return {
       ticker: t,
       company: d?.search_metadata?.company_name || t,
       market: d?.search_metadata?.market || '—',
       analyzed: !!d,
       timestamp,
+      currentPrice,
+      bestUpsideItem,
       score,
       col,
       sentiment: s?.overall_sentiment || '⏳ Non analizzato',
@@ -773,6 +779,11 @@ export default function App() {
                 <span className="wt-ticker" style={{ color: row.col.text }}>
                   {row.ticker}
                   <span className="wt-company">{row.company}</span>
+                  {row.currentPrice && (
+                    <span style={{ fontSize: '0.72rem', color: '#38bdf8', marginTop: '2px', display: 'block', fontWeight: 'bold' }}>
+                      📈 {row.currentPrice}
+                    </span>
+                  )}
                   {row.timestamp && (
                     <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px', display: 'block', fontWeight: 'normal' }}>
                       📅 {row.timestamp}
@@ -797,7 +808,28 @@ export default function App() {
                     <span style={{ color: '#475569', fontSize: '0.8rem' }}>—</span>
                   )}
                 </span>
-                <span className="wt-impact">{row.impact}</span>
+                <span className="wt-impact">
+                  {row.impact}
+                  {row.bestUpsideItem && row.bestUpsideItem.upside_percent !== undefined && row.bestUpsideItem.upside_percent > 0 && (
+                    <div style={{ marginTop: '4px' }}>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          padding: '0.15rem 0.45rem',
+                          borderRadius: '10px',
+                          fontSize: '0.72rem',
+                          fontWeight: 'bold',
+                          background: 'rgba(34,197,94,0.2)',
+                          color: '#4ade80',
+                          border: '1px solid #22c55e'
+                        }}
+                        title={`Target ${row.bestUpsideItem.broker}: ${row.bestUpsideItem.target_price}`}
+                      >
+                        🚀 Target Superiore +{row.bestUpsideItem.upside_percent}% ({row.bestUpsideItem.target_price})
+                      </span>
+                    </div>
+                  )}
+                </span>
                 <span style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                   <button
                     className={row.analyzed ? 'btn-secondary' : 'btn-primary'}
@@ -1006,16 +1038,61 @@ export default function App() {
                 {/* Analisti */}
                 <div className="card">
                   <div className="card-title">🎯 Target Price &amp; Analisti</div>
+                  {data.search_metadata?.current_market_price && (
+                    <div style={{ padding: '0.5rem 0.8rem', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.3)', borderRadius: '8px', marginBottom: '0.8rem', fontSize: '0.82rem', color: '#38bdf8', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>📈 Prezzo Live (Yahoo Finance):</span>
+                      <strong style={{ fontSize: '0.95rem' }}>{data.search_metadata.current_market_price}</strong>
+                    </div>
+                  )}
+
                   {(data.analyst_ratings_and_targets || []).length > 0
-                    ? data.analyst_ratings_and_targets.map((item, idx) => (
-                      <div key={idx} className="analyst-row">
-                        <div className="analyst-broker"><strong>{item.broker}</strong></div>
-                        <div className="analyst-rating">{item.rating}</div>
-                        <div className="analyst-target">{item.currency} {item.target_price}</div>
-                        <div className="analyst-date">📅 {item.date}</div>
-                        {item.note && <div className="analyst-note">💬 {item.note}</div>}
-                      </div>
-                    ))
+                    ? data.analyst_ratings_and_targets.map((item, idx) => {
+                        const isHigher = item.is_target_higher || (item.upside_percent > 0);
+                        return (
+                          <div
+                            key={idx}
+                            className="analyst-row"
+                            style={{
+                              borderLeft: isHigher ? '3px solid #22c55e' : '3px solid #64748b',
+                              background: isHigher ? 'rgba(34,197,94,0.08)' : 'rgba(30,41,59,0.4)',
+                              padding: '0.65rem 0.8rem',
+                              borderRadius: '8px',
+                              marginBottom: '0.6rem'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span className="analyst-broker"><strong>{item.broker}</strong></span>
+                              <span className="analyst-rating" style={{ background: isHigher ? 'rgba(34,197,94,0.2)' : 'rgba(100,116,139,0.2)', color: isHigher ? '#4ade80' : '#cbd5e1', padding: '0.15rem 0.5rem', borderRadius: '6px', fontSize: '0.78rem' }}>
+                                {item.rating}
+                              </span>
+                            </div>
+
+                            <div style={{ marginTop: '0.4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
+                              <div className="analyst-target" style={{ fontSize: '0.95rem', fontWeight: 'bold', color: isHigher ? '#4ade80' : '#f8fafc' }}>
+                                Target: {item.currency || ''} {item.target_price}
+                              </div>
+                              {item.upside_percent !== undefined && item.upside_percent !== null && (
+                                <span
+                                  style={{
+                                    padding: '0.2rem 0.55rem',
+                                    borderRadius: '12px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 'bold',
+                                    background: item.upside_percent > 0 ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.2)',
+                                    color: item.upside_percent > 0 ? '#4ade80' : '#f87171',
+                                    border: item.upside_percent > 0 ? '1px solid #22c55e' : '1px solid #ef4444'
+                                  }}
+                                >
+                                  {item.upside_percent > 0 ? `🚀 Target Superiore (+${item.upside_percent}%)` : `🔻 ${item.upside_percent}%`}
+                                </span>
+                              )}
+                            </div>
+
+                            {item.note && <div className="analyst-note" style={{ fontSize: '0.8rem', color: '#cbd5e1', marginTop: '0.35rem' }}>💬 {item.note}</div>}
+                            <div className="analyst-date" style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.3rem' }}>📅 Aggiornato: {item.date}</div>
+                          </div>
+                        );
+                      })
                     : <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Nessun dato analisti disponibile.</p>}
                 </div>
 

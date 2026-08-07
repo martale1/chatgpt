@@ -45,6 +45,27 @@ def safe_print(*values):
     print(*values, flush=True)
 
 
+import yfinance as yf
+
+
+def get_live_market_data(ticker):
+    if not ticker:
+        return None
+    try:
+        t = yf.Ticker(ticker.strip())
+        price = None
+        if hasattr(t, "fast_info") and "lastPrice" in t.fast_info:
+            price = t.fast_info["lastPrice"]
+        if price is None:
+            hist = t.history(period="5d")
+            if not hist.empty:
+                price = float(hist["Close"].iloc[-1])
+        return round(float(price), 2) if price else None
+    except Exception as exc:
+        safe_print(f"Impossibile recuperare prezzo live yfinance per {ticker}: {exc}")
+        return None
+
+
 def build_stock_prompt(company, ticker="", market=""):
     instrument = company
     if ticker:
@@ -52,8 +73,13 @@ def build_stock_prompt(company, ticker="", market=""):
     if market:
         instrument += f" - {market}"
 
-    return f"""Cerca news di oggi e degli ultimi 3 giorni su {instrument}.
+    current_price = get_live_market_data(ticker)
+    price_prompt_note = f"\nNota prezzo di mercato attuale (Yahoo Finance): {current_price}" if current_price else ""
+
+    return f"""Cerca news di oggi e degli ultimi 3 giorni su {instrument}.{price_prompt_note}
 Rispondi SOLO con un blocco JSON valido, nessun testo prima o dopo.
+ATTENZIONE RIGOROSA: L'analisi DEVE riguardare ESCLUSIVAMENTE l'azienda {company} (Ticker: {ticker}, Mercato: {market}). NON includere informazioni su altre societa'.
+
 Usa esattamente questo schema JSON (sostituisci i valori tra [ ]):
 
 ```json
@@ -63,6 +89,7 @@ Usa esattamente questo schema JSON (sostituisci i valori tra [ ]):
     "company_name": "{company}",
     "ticker": "{ticker}",
     "market": "{market}",
+    "current_market_price": {current_price if current_price else "null"},
     "timestamp_utc": "[data e ora UTC attuale in formato ISO 8601]"
   }},
   "market_sentiment_summary": {{

@@ -67,6 +67,24 @@ function parseReport(text, ticker, company) {
   parsed.analyst_ratings_and_targets = parsed.analyst_ratings_and_targets || [];
   parsed.technical_levels = parsed.technical_levels || { supports: [], resistances: [], critical_levels_notes: '' };
 
+  // Calculate upside potential vs current market price from Yahoo Finance
+  const currentPrice = parsed.search_metadata.current_market_price;
+  if (Array.isArray(parsed.analyst_ratings_and_targets)) {
+    parsed.analyst_ratings_and_targets.forEach(item => {
+      if (!item) return;
+      const targetStr = String(item.target_price || '');
+      const numMatch = targetStr.match(/([0-9]+(?:[\.,][0-9]+)?)/);
+      if (numMatch && currentPrice && currentPrice > 0) {
+        const targetNum = parseFloat(numMatch[1].replace(',', '.'));
+        item.target_numeric = targetNum;
+        item.current_price = currentPrice;
+        const upsidePct = ((targetNum - currentPrice) / currentPrice) * 100;
+        item.upside_percent = Math.round(upsidePct * 10) / 10;
+        item.is_target_higher = targetNum > currentPrice;
+      }
+    });
+  }
+
   // Sanity check: ensure response is not contaminated by previous company (e.g. Vodafone leaking into non-Vodafone ticker)
   const fullText = JSON.stringify(parsed).toLowerCase();
   if (ticker !== 'VOD.L' && (fullText.includes('vodafonethree') || fullText.includes('vodafone group'))) {
