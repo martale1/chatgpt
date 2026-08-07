@@ -232,9 +232,25 @@ const server = http.createServer((req, meRes) => {
     return;
   }
 
+  // Serve generated PNG charts
+  if (parsedUrl.pathname.startsWith('/finance_charts/') && req.method === 'GET') {
+    const filename = path.basename(parsedUrl.pathname);
+    const filePath = path.join(__dirname, 'finance_charts', filename);
+    if (fs.existsSync(filePath)) {
+      meRes.writeHead(200, { 'Content-Type': 'image/png', 'Access-Control-Allow-Origin': '*' });
+      fs.createReadStream(filePath).pipe(meRes);
+      return;
+    } else {
+      meRes.writeHead(404, { 'Content-Type': 'text/plain' });
+      meRes.end('Image Not Found');
+      return;
+    }
+  }
+
   if ((parsedUrl.pathname === '/api/analyze' || parsedUrl.pathname === '/api/analyze-stock') && req.method === 'GET') {
     const res = meRes;
     const ticker = parsedUrl.query.ticker || 'VOD.L';
+    const isChart = parsedUrl.query.type === 'chart' || parsedUrl.query.chart === 'true';
     const info = getCompanyInfo(ticker);
 
     res.writeHead(200, {
@@ -244,7 +260,7 @@ const server = http.createServer((req, meRes) => {
       'Access-Control-Allow-Origin': '*'
     });
     
-    res.write(`data: ${JSON.stringify({ type: 'log', agent: 'Controller & Orchestrator Agent', msg: `Avvio dello scraper Playwright per il ticker: ${ticker}` })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'log', agent: 'Controller & Orchestrator Agent', msg: `Avvio dello scraper Playwright (${isChart ? 'Analisi Grafico AI' : 'Analisi News'}) per il ticker: ${ticker}` })}\n\n`);
 
     const args = [
       path.join(__dirname, 'chatgpt_playwright_demo.py'),
@@ -253,8 +269,11 @@ const server = http.createServer((req, meRes) => {
       '--market', info.market,
       '--no-telegram'
     ];
+    if (isChart) {
+      args.push('--analyze-chart');
+    }
 
-    res.write(`data: ${JSON.stringify({ type: 'log', agent: 'Playwright Scraper Agent', msg: `Eseguo: python3 chatgpt_playwright_demo.py --ticker ${ticker} --company "${info.company}" --market "${info.market}"` })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'log', agent: 'Playwright Scraper Agent', msg: `Eseguo: python3 chatgpt_playwright_demo.py --ticker ${ticker} --company "${info.company}" --market "${info.market}" ${isChart ? '--analyze-chart' : ''}` })}\n\n`);
 
     const scraperProcess = spawn(PYTHON_PATH, args, { shell: false });
 
@@ -299,9 +318,10 @@ const server = http.createServer((req, meRes) => {
           return;
         }
 
+        const cacheKey = isChart ? (ticker.trim().toUpperCase() + '_CHART') : ticker.trim().toUpperCase();
         const parsedData = parseReport(chatGptResponse, ticker.trim().toUpperCase(), info.company);
-        saveTickerAnalysis(ticker.trim().toUpperCase(), parsedData);
-        res.write(`data: ${JSON.stringify({ type: 'data', data: parsedData })}\n\n`);
+        saveTickerAnalysis(cacheKey, parsedData);
+        res.write(`data: ${JSON.stringify({ type: 'data', data: parsedData, isChart: isChart })}\n\n`);
       } catch (err) {
         res.write(`data: ${JSON.stringify({ type: 'error', msg: `Errore parsing report: ${err.message}` })}\n\n`);
       }

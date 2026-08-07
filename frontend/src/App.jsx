@@ -331,6 +331,81 @@ export default function App() {
     }
   };
 
+  // ── Avvia analisi grafico reale via Playwright Vision → server.js → ChatGPT ──
+  const runChartAgentAnalysis = (target) => {
+    if (!target) return;
+
+    setQuery(target);
+    setLoading(true);
+    setLogs([]);
+    setActiveTab('logs');
+
+    const showAnalysisError = (reason) => {
+      setLogs(prev => [...prev, {
+        agent: 'System',
+        msg: `❌ ANALISI GRAFICO FALLITA per ${target}\n\nMotivo: ${reason}\n\nVerifica che:\n1. Il server bridge (node server.js) sia attivo sulla porta 3001\n2. Il ticker "${target}" esista realmente sui mercati finanziari\n3. ChatGPT sia accessibile e la sessione sia attiva`,
+        time: new Date().toLocaleTimeString()
+      }]);
+      setLoading(false);
+    };
+
+    try {
+      const eventSource = new EventSource(`http://localhost:3001/api/analyze?ticker=${encodeURIComponent(target)}&type=chart`);
+
+      let connectionTimeout = setTimeout(() => {
+        eventSource.close();
+        showAnalysisError('Timeout connessione al server bridge (porta 3001). Assicurati che node server.js sia in esecuzione.');
+      }, 1500);
+
+      eventSource.onopen = () => {
+        clearTimeout(connectionTimeout);
+        setLogs(prev => [...prev, {
+          agent: 'System',
+          msg: '⚡ Connesso al server bridge locale per Analisi Grafico AI. Generazione ed invio del grafico a ChatGPT Vision...',
+          time: new Date().toLocaleTimeString()
+        }]);
+      };
+
+      eventSource.onmessage = (event) => {
+        try {
+          const eventData = JSON.parse(event.data);
+
+          if (eventData.type === 'log') {
+            setLogs(prev => [...prev, {
+              agent: eventData.agent,
+              msg: eventData.msg,
+              time: new Date().toLocaleTimeString()
+            }]);
+          } else if (eventData.type === 'data') {
+            const chartData = eventData.data;
+            const chartKey = target + '_CHART';
+            setRealTickerData(prev => ({ ...prev, [chartKey]: chartData }));
+            eventSource.close();
+            setLoading(false);
+            setLogs(prev => [...prev, {
+              agent: 'System',
+              msg: '✅ Analisi Grafico completata! Passa alla Dashboard per vedere i risultati visivi del grafico.',
+              time: new Date().toLocaleTimeString()
+            }]);
+          } else if (eventData.type === 'error') {
+            eventSource.close();
+            showAnalysisError(eventData.msg);
+          }
+        } catch (e) {
+          eventSource.close();
+          showAnalysisError(`Errore lettura stream log: ${e.message}`);
+        }
+      };
+
+      eventSource.onerror = () => {
+        eventSource.close();
+        showAnalysisError('Connessione al server bridge interrotta o server non disponibile.');
+      };
+    } catch (err) {
+      showAnalysisError(err.message);
+    }
+  };
+
   // ── Helper Promise per eseguire l'analisi live di un singolo ticker ───────
   const analyzeSingleTickerAsync = (target, index, total) => {
     return new Promise((resolve) => {
@@ -999,6 +1074,28 @@ export default function App() {
                       🔄 Aggiorna Analisi Live
                     </button>
 
+                    <button
+                      onClick={() => runChartAgentAnalysis(data.search_metadata.ticker)}
+                      disabled={loading}
+                      style={{
+                        marginLeft: '0.5rem',
+                        background: 'rgba(168, 85, 247, 0.15)',
+                        border: '1px solid rgba(168, 85, 247, 0.4)',
+                        color: '#c084fc',
+                        padding: '0.25rem 0.6rem',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        fontWeight: '600',
+                      }}
+                      title="Genera grafico ed esegue l'analisi visuale AI tramite Playwright Vision"
+                    >
+                      📊 Analizza Grafico AI
+                    </button>
+
                     {data.search_metadata.timestamp_utc && (
                       <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#94a3b8', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                         📅 Analisi del: {new Date(data.search_metadata.timestamp_utc).toLocaleString('it-IT', {
@@ -1043,6 +1140,92 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                {/* ANALISI GRAFICO AI (SE DISPONIBILE O SU RICHIESTA) */}
+                {(() => {
+                  const chartData = realTickerData[query + '_CHART'] || realTickerData[data.search_metadata.ticker + '_CHART'];
+                  const cta = chartData?.chart_technical_analysis;
+                  const chartImageUrl = `http://localhost:3001/finance_charts/${data.search_metadata.ticker}_price_alligator.png`;
+
+                  return (
+                    <div className="card" style={{ border: '1px solid rgba(168, 85, 247, 0.4)', background: 'linear-gradient(180deg, rgba(30,27,75,0.4) 0%, rgba(15,23,42,0.6) 100%)' }}>
+                      <div className="card-title" style={{ color: '#c084fc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <span>📈 Analisi Visuale Grafico AI (Playwright Vision)</span>
+                        <button
+                          onClick={() => runChartAgentAnalysis(data.search_metadata.ticker)}
+                          disabled={loading}
+                          style={{
+                            background: 'rgba(168, 85, 247, 0.2)',
+                            border: '1px solid #a855f7',
+                            color: '#e9d5ff',
+                            padding: '0.3rem 0.75rem',
+                            borderRadius: '8px',
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                            fontWeight: '600',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.3rem'
+                          }}
+                        >
+                          {loading ? '⏳ Elaborazione...' : (cta ? '🔄 Rigenera Grafico AI' : '📊 Genera & Analizza Grafico AI')}
+                        </button>
+                      </div>
+
+                      {cta ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem', marginTop: '0.8rem' }}>
+                          <div>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#94a3b8', marginBottom: '0.4rem' }}>📷 Grafico Tecnico Generato dal Codice:</div>
+                            <a href={chartImageUrl} target="_blank" rel="noreferrer">
+                              <img
+                                src={chartImageUrl}
+                                alt={`Grafico ${data.search_metadata.ticker}`}
+                                style={{ width: '100%', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', background: '#000' }}
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
+                            </a>
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                            <div style={{ padding: '0.6rem 0.8rem', background: 'rgba(168, 85, 247, 0.1)', borderRadius: '8px', borderLeft: '3px solid #a855f7' }}>
+                              <span style={{ fontSize: '0.8rem', color: '#c084fc', fontWeight: 700 }}>Trend Rilevato: </span>
+                              <span style={{ fontSize: '0.9rem', color: '#f8fafc', fontWeight: 600 }}>{cta.overall_trend}</span>
+                            </div>
+
+                            {cta.candlestick_pattern && (
+                              <div style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>
+                                <strong style={{ color: '#c084fc' }}>🕯️ Pattern Candele:</strong> {cta.candlestick_pattern}
+                              </div>
+                            )}
+
+                            {cta.rsi_macd_summary && (
+                              <div style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>
+                                <strong style={{ color: '#38bdf8' }}>📊 RSI &amp; MACD:</strong> {cta.rsi_macd_summary}
+                              </div>
+                            )}
+
+                            {cta.key_scenario && (
+                              <div style={{ fontSize: '0.82rem', color: '#cbd5e1', background: 'rgba(30,41,59,0.5)', padding: '0.5rem 0.7rem', borderRadius: '6px' }}>
+                                <strong style={{ color: '#4ade80' }}>🎯 Scenario Chiave:</strong> {cta.key_scenario}
+                              </div>
+                            )}
+
+                            {cta.operational_note && (
+                              <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic', marginTop: '0.3rem' }}>
+                                💡 <strong>Nota Operativa:</strong> {cta.operational_note}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ padding: '1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+                          <p>Nessuna analisi grafica visiva ancora generata per <strong>{data.search_metadata.company_name}</strong>.</p>
+                          <p style={{ marginTop: '0.4rem', fontSize: '0.8rem' }}>Clicca sul pulsante in alto a destra <strong>"📊 Genera &amp; Analizza Grafico AI"</strong> per creare il grafico con indicatori tecnici ed inviarlo a ChatGPT Vision!</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* NOTIZIE ULTIME 3 GIORNI */}
                 <div className="card">

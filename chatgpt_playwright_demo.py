@@ -368,6 +368,94 @@ def run_in_page(page, prompt, login_only):
     return response
 
 
+def build_chart_prompt(company, ticker, market, snapshot):
+    return f"""Analizza i grafici tecnici allegati del titolo {company} ({ticker}).
+
+Dati numerici calcolati dal codice:
+- Data ultima barra: {snapshot.get('date', 'N/D')}
+- Prezzo Chiusura: {snapshot.get('close', 0):.4f}
+- RSI (14): {snapshot.get('rsi', 0):.2f}
+- MACD: {snapshot.get('macd', 0):.4f}
+- MACD Signal: {snapshot.get('macd_signal', 0):.4f}
+- ADX: {snapshot.get('adx', 0):.2f}
+- DI+: {snapshot.get('plus_di', 0):.2f}
+- DI-: {snapshot.get('minus_di', 0):.2f}
+- Supporto a breve (10d): {snapshot.get('support_10', 0):.4f}
+- Supporto a medio (30d): {snapshot.get('support_30', 0):.4f}
+- Resistenza a breve (10d): {snapshot.get('resistance_10', 0):.4f}
+- Resistenza a medio (30d): {snapshot.get('resistance_30', 0):.4f}
+
+Rispondi ESCLUSIVAMENTE con un blocco di codice JSON valido strutturato cosi:
+
+```json
+{{
+  "search_metadata": {{
+    "query_input": "{ticker}",
+    "company_name": "{company}",
+    "ticker": "{ticker}",
+    "market": "{market}",
+    "analysis_type": "chart_ai",
+    "timestamp_utc": "{snapshot.get('date', '')}"
+  }},
+  "chart_technical_analysis": {{
+    "overall_trend": "[Rialzista / Ribassista / Neutro / Consolidamento]",
+    "candlestick_pattern": "[descrizione visiva del pattern recente es. Hammer, Engulfing, Doji, Breakout]",
+    "volume_analysis": "[lettura visiva dei volumi rispetto alla media sui picchi di prezzo]",
+    "chart_supports": ["{snapshot.get('support_10', 0):.2f} €", "{snapshot.get('support_30', 0):.2f} €"],
+    "chart_resistances": ["{snapshot.get('resistance_10', 0):.2f} €", "{snapshot.get('resistance_30', 0):.2f} €"],
+    "rsi_macd_summary": "[sintesi visiva di RSI e incroci MACD sul grafico]",
+    "key_scenario": "[Scenario principale e livello di conferma per eventuale entrata/uscita]",
+    "operational_note": "[max 3 righe con indicazione prudente per il trader]"
+  }}
+}}
+```
+
+Regole:
+- Rispondi SOLO ed ESCLUSIVAMENTE con il blocco ```json``` senza alcun altro testo prima o dopo.
+- Analizza attentamente sia l'immagine del grafico che i dati numerici forniti sopra."""
+
+
+def run_chart_report(context, stock):
+    safe_print(f"\n=== Generazione & Analisi Grafico AI: {stock['company']} ({stock['ticker']}) ===")
+    output_dir = Path("finance_charts")
+    output_dir.mkdir(exist_ok=True)
+    snapshot = {}
+    chart_file = None
+    try:
+        from finance_charts.technical_charts import create_chart_bundle
+        bundle = create_chart_bundle(stock["ticker"], output_dir)
+        snapshot = bundle.get("snapshot", {})
+        if bundle.get("files") and len(bundle["files"]) > 0:
+            chart_file = bundle["files"][0]
+            safe_print(f"Grafico generato con successo: {chart_file}")
+    except Exception as e:
+        safe_print(f"Avviso: generazione grafico locale non riuscita ({e}). Continuo senza immagine.")
+
+    prompt = build_chart_prompt(stock["company"], stock["ticker"], stock["market"], snapshot)
+    page = open_chatgpt_page(context)
+    try:
+        if chart_file and os.path.exists(chart_file):
+            safe_print(f"Caricamento file grafico {chart_file} su ChatGPT...")
+            try:
+                file_input = page.locator("input[type='file']").first
+                file_input.wait_for(state="attached", timeout=5000)
+                file_input.set_input_files(str(Path(chart_file).resolve()))
+                safe_print("File grafico allegato! Attendo rendering anteprima...")
+                page.wait_for_timeout(3000)
+            except Exception as fe:
+                safe_print(f"Nota: Impossibile allegare il file direttamente ({fe}). Invio dati numerici del grafico.")
+
+        return run_in_page(page, prompt, False)
+    except Exception as exc:
+        safe_print(f"Errore analisi grafico {stock['ticker']}: {exc}")
+        return ""
+    finally:
+        try:
+            page.close()
+        except Exception:
+            pass
+
+
 def run_stock_report(context, stock, index=1, total=1):
     safe_print(f"\n=== Analisi {index}/{total}: {stock['company']} ({stock['ticker']}) ===")
     prompt = build_stock_prompt(stock["company"], stock["ticker"], stock["market"])
@@ -380,7 +468,7 @@ def run_stock_report(context, stock, index=1, total=1):
     finally:
         try:
             page.close()
-        except PlaywrightError:
+        except Exception:
             pass
 
 
@@ -463,6 +551,11 @@ def main():
         action="store_true",
         help="Disattiva l'invio Telegram anche se SEND_TELEGRAM_BY_DEFAULT e True.",
     )
+    parser.add_argument(
+        "--analyze-chart",
+        action="store_true",
+        help="Genera grafico locale ed esegue l'analisi visuale AI del grafico via Playwright.",
+    )
     args = parser.parse_args()
     send_to_telegram = False if args.no_telegram else (args.telegram or SEND_TELEGRAM_BY_DEFAULT)
     if args.stocks:
@@ -509,7 +602,12 @@ def main():
                     safe_print(f"Impossibile avviare il browser: {e2}")
                     return
 
-        if args.prompt or args.login_only:
+        if args.analyze_chart:
+            for index, stock in enumerate(stock_list, start=1):
+                response = run_chart_report(context, stock)
+                if send_to_telegram and response:
+                    send_telegram_message(response)
+        elif args.prompt or args.login_only:
             prompt = args.prompt or build_stock_prompt(args.company, args.ticker, args.market)
             page = open_chatgpt_page(context)
             response = run_in_page(page, prompt, args.login_only)
