@@ -126,17 +126,43 @@ export default function App() {
     return {};
   });
 
-  // Watchlist persistita
-  const [watchlist, setWatchlist] = useState(() => {
-    const saved = localStorage.getItem('watchlist_tickers');
+  // ── Mappa Multi-Watchlist (persistita in localStorage) ─────────────────────
+  const [watchlists, setWatchlists] = useState(() => {
+    const saved = localStorage.getItem('custom_watchlists');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+          return parsed;
+        }
       } catch (e) {}
     }
-    return ['AVIO.MI', 'VOD.L', 'A2A.MI', 'NVDA', 'AAPL'];
+    // Migrazione da salvataggio precedente o lista standard
+    const legacySaved = localStorage.getItem('watchlist_tickers');
+    let legacyList = ['AVIO.MI', 'VOD.L', 'A2A.MI', 'NVDA', 'AAPL', 'STLAM.MI', 'AMD.O', 'BC.MI', 'ENEL.MI', 'STMMI.MI', 'SRG.MI', 'REY.MI', 'CPR.MI'];
+    if (legacySaved) {
+      try {
+        const parsed = JSON.parse(legacySaved);
+        if (Array.isArray(parsed) && parsed.length > 0) legacyList = parsed;
+      } catch (e) {}
+    }
+    return {
+      '⭐ Preferiti': legacyList,
+      '💻 Tech USA': ['NVDA', 'AAPL', 'MSFT', 'AMD.O', 'TSLA'],
+      '🏛️ FTSE MIB': ['AVIO.MI', 'A2A.MI', 'STLAM.MI', 'ENEL.MI', 'SRG.MI']
+    };
   });
+
+  const [activeWatchlistName, setActiveWatchlistName] = useState(() => {
+    const saved = localStorage.getItem('active_watchlist_name');
+    if (saved) return saved;
+    return '⭐ Preferiti';
+  });
+
+  const [newWatchlistNameInput, setNewWatchlistNameInput] = useState('');
+  const [showCreateWatchlistModal, setShowCreateWatchlistModal] = useState(false);
+
+  const watchlist = watchlists[activeWatchlistName] || watchlists['⭐ Preferiti'] || [];
 
   const [newTickersInput, setNewTickersInput] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -144,8 +170,12 @@ export default function App() {
   const [sortOrder, setSortOrder] = useState('desc'); // default: score più alto prima ('desc')
 
   useEffect(() => {
-    localStorage.setItem('watchlist_tickers', JSON.stringify(watchlist));
-  }, [watchlist]);
+    localStorage.setItem('custom_watchlists', JSON.stringify(watchlists));
+  }, [watchlists]);
+
+  useEffect(() => {
+    localStorage.setItem('active_watchlist_name', activeWatchlistName);
+  }, [activeWatchlistName]);
 
   useEffect(() => {
     localStorage.setItem('real_ticker_data', JSON.stringify(realTickerData));
@@ -161,12 +191,21 @@ export default function App() {
     }
   }, []);
 
+  // ── Helper per aggiornare la Watchlist attiva corrente ─────────────────────
+  const updateCurrentWatchlist = (updater) => {
+    setWatchlists(prev => {
+      const current = prev[activeWatchlistName] || [];
+      const updatedList = typeof updater === 'function' ? updater(current) : updater;
+      return { ...prev, [activeWatchlistName]: updatedList };
+    });
+  };
+
   // ── Cerca ticker: mostra dati se disponibili, altrimenti avvia subito l'analisi ──
   const handleSearch = (searchTerm, autoAnalyze = true) => {
     const target = (searchTerm || query).trim().toUpperCase();
     if (!target) return;
     setQuery(target);
-    setWatchlist(prev => prev.includes(target) ? prev : [...prev, target]);
+    updateCurrentWatchlist(prev => prev.includes(target) ? prev : [...prev, target]);
 
     if (realTickerData[target]) {
       setData(realTickerData[target]);
@@ -369,7 +408,7 @@ export default function App() {
     setLoading(false);
   };
 
-  // ── Aggiungi ticker alla watchlist ────────────────────────────────────────
+  // ── Aggiungi ticker alla watchlist attiva ────────────────────────────────
   const handleAddTickers = () => {
     if (!newTickersInput.trim()) return;
     const tickers = newTickersInput
@@ -377,7 +416,7 @@ export default function App() {
       .map(t => t.trim().toUpperCase())
       .filter(t => t.length > 0);
     if (tickers.length === 0) return;
-    setWatchlist(prev => {
+    updateCurrentWatchlist(prev => {
       const updated = [...prev];
       tickers.forEach(t => { if (!updated.includes(t)) updated.push(t); });
       return updated;
@@ -386,9 +425,9 @@ export default function App() {
     handleSearch(tickers[0]);
   };
 
-  // ── Rimuovi ticker dalla watchlist ───────────────────────────────────────
+  // ── Rimuovi ticker dalla watchlist attiva ────────────────────────────────
   const removeFromWatchlist = (targetToRemove) => {
-    setWatchlist(prev => prev.filter(t => t !== targetToRemove));
+    updateCurrentWatchlist(prev => prev.filter(t => t !== targetToRemove));
     setRealTickerData(prev => {
       const copy = { ...prev };
       delete copy[targetToRemove];
@@ -398,6 +437,40 @@ export default function App() {
       setData(null);
       setQuery('');
     }
+  };
+
+  // ── Crea una nuova Watchlist personalizzata ──────────────────────────────
+  const handleCreateWatchlist = () => {
+    const name = newWatchlistNameInput.trim();
+    if (!name) return;
+    if (watchlists[name]) {
+      alert(`La watchlist "${name}" esiste già!`);
+      return;
+    }
+    setWatchlists(prev => ({ ...prev, [name]: [] }));
+    setActiveWatchlistName(name);
+    setNewWatchlistNameInput('');
+    setShowCreateWatchlistModal(false);
+  };
+
+  // ── Elimina una Watchlist personalizzata ──────────────────────────────────
+  const handleDeleteWatchlist = (nameToDelete, e) => {
+    if (e) e.stopPropagation();
+    if (Object.keys(watchlists).length <= 1) {
+      alert("Devi mantenere almeno una Watchlist attiva.");
+      return;
+    }
+    if (!window.confirm(`Sei sicuro di voler eliminare la watchlist "${nameToDelete}"?`)) return;
+
+    setWatchlists(prev => {
+      const copy = { ...prev };
+      delete copy[nameToDelete];
+      const remainingNames = Object.keys(copy);
+      if (activeWatchlistName === nameToDelete) {
+        setActiveWatchlistName(remainingNames[0]);
+      }
+      return copy;
+    });
   };
 
   // ── Badge / indicatori ────────────────────────────────────────────────────
@@ -512,11 +585,78 @@ export default function App() {
             value={newTickersInput}
             onChange={(e) => setNewTickersInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAddTickers()}
-            placeholder="Aggiungi Ticker alla Watchlist (separa con virgola es. TSLA, MSFT, META)..."
+            placeholder={`Aggiungi Ticker a "${activeWatchlistName}" (separa con virgola es. TSLA, MSFT, META)...`}
           />
           <button className="btn-secondary" onClick={handleAddTickers} style={{ minWidth: '140px' }}>
             ➕ Aggiungi Titoli
           </button>
+        </div>
+
+        {/* ── MULTI-WATCHLIST SELECTION TABS BAR ── */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem', marginTop: '0.8rem', padding: '0.6rem 0.8rem', background: 'rgba(15,23,42,0.6)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#94a3b8' }}>📁 Watchlist Attiva:</span>
+            {Object.keys(watchlists).map((listName) => {
+              const isSelected = listName === activeWatchlistName;
+              const count = watchlists[listName]?.length || 0;
+              return (
+                <div
+                  key={listName}
+                  onClick={() => setActiveWatchlistName(listName)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '8px',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    background: isSelected ? 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)' : 'rgba(30,41,59,0.8)',
+                    border: isSelected ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.08)',
+                    color: isSelected ? '#ffffff' : '#94a3b8',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <span>{listName}</span>
+                  <span style={{ fontSize: '0.72rem', opacity: 0.85, background: 'rgba(0,0,0,0.25)', padding: '0.1rem 0.4rem', borderRadius: '10px' }}>{count}</span>
+                  {Object.keys(watchlists).length > 1 && listName !== '⭐ Preferiti' && (
+                    <span
+                      onClick={(e) => handleDeleteWatchlist(listName, e)}
+                      style={{ marginLeft: '0.2rem', color: isSelected ? '#fca5a5' : '#ef4444', opacity: 0.8, fontSize: '0.75rem' }}
+                      title={`Elimina watchlist "${listName}"`}
+                    >
+                      ✕
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {!showCreateWatchlistModal ? (
+            <button
+              className="btn-secondary"
+              onClick={() => setShowCreateWatchlistModal(true)}
+              style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+            >
+              ➕ Nuova Lista
+            </button>
+          ) : (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+              <input
+                type="text"
+                value={newWatchlistNameInput}
+                onChange={(e) => setNewWatchlistNameInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateWatchlist()}
+                placeholder="Nome lista (es. Crypto, Bancari)..."
+                style={{ padding: '0.35rem 0.6rem', fontSize: '0.78rem', width: '190px' }}
+                autoFocus
+              />
+              <button className="btn-primary" onClick={handleCreateWatchlist} style={{ padding: '0.35rem 0.6rem', fontSize: '0.78rem' }}>Crea</button>
+              <button className="btn-secondary" onClick={() => setShowCreateWatchlistModal(false)} style={{ padding: '0.35rem 0.5rem', fontSize: '0.78rem' }}>Annulla</button>
+            </div>
+          )}
         </div>
 
         <div className="quick-tickers">
@@ -557,8 +697,8 @@ export default function App() {
         <div className="watchlist-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             <div>
-              <span className="watchlist-title">📊 Watchlist — Sentiment Overview</span>
-              <span className="watchlist-sub">{watchlist.length} titoli nella tua lista monitorata</span>
+              <span className="watchlist-title">📊 Watchlist: {activeWatchlistName}</span>
+              <span className="watchlist-sub">{watchlist.length} titoli monitorati in questa lista</span>
             </div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
               <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Ordinamento:</span>
