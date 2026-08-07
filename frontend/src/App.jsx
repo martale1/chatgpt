@@ -177,6 +177,7 @@ export default function App() {
   const [crosshairPos, setCrosshairPos] = useState(null);
   const [clickedBar, setClickedBar] = useState(null);
   const [chartVersion, setChartVersion] = useState(Date.now());
+  const [showJsonOutput, setShowJsonOutput] = useState(false);
 
   // ── Sincronizzazione con Server Backend (per la persistenza multi-browser) ──
   useEffect(() => {
@@ -1082,103 +1083,105 @@ export default function App() {
               loading={loading}
             />
           ) : (
-            <div className="grid-layout">
-              <div className="main-content">
+            <div className="dashboard-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              
+              {/* 1. SUMMARY CARD */}
+              <div className="card card-summary" style={{ marginBottom: 0 }}>
+                <div className="card-title">
+                  📋 Sintesi &amp; Sentiment — {data.search_metadata.company_name}
+                  <span style={{ marginLeft: '0.2rem', color: '#94a3b8', fontWeight: '500' }}>({data.search_metadata.ticker})</span>
+                  <span style={{ marginLeft: '0.5rem' }}>{getSentimentBadge(ms?.overall_sentiment)}</span>
 
-                {/* SUMMARY */}
-                <div className="card card-summary">
-                  <div className="card-title">
-                    📋 Sintesi &amp; Sentiment — {data.search_metadata.company_name}
-                    <span style={{ marginLeft: '0.2rem', color: '#94a3b8', fontWeight: '500' }}>({data.search_metadata.ticker})</span>
-                    <span style={{ marginLeft: '0.5rem' }}>{getSentimentBadge(ms?.overall_sentiment)}</span>
+                  <button
+                    onClick={() => runAgentAnalysis(data.search_metadata.ticker)}
+                    style={{
+                      marginLeft: '1rem',
+                      background: 'rgba(56, 189, 248, 0.1)',
+                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                      color: '#38bdf8',
+                      padding: '0.25rem 0.6rem',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      fontWeight: '600',
+                    }}
+                    title="Avvia nuova analisi reale via ChatGPT"
+                  >
+                    🔄 Aggiorna Analisi Live
+                  </button>
 
-                    <button
-                      onClick={() => runAgentAnalysis(data.search_metadata.ticker)}
-                      style={{
-                        marginLeft: '1rem',
-                        background: 'rgba(56, 189, 248, 0.1)',
-                        border: '1px solid rgba(56, 189, 248, 0.3)',
-                        color: '#38bdf8',
-                        padding: '0.25rem 0.6rem',
-                        borderRadius: '6px',
-                        fontSize: '0.75rem',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                        fontWeight: '600',
-                      }}
-                      title="Avvia nuova analisi reale via ChatGPT"
-                    >
-                      🔄 Aggiorna Analisi Live
-                    </button>
+                  <button
+                    onClick={() => runChartAgentAnalysis(data.search_metadata.ticker)}
+                    disabled={loading}
+                    style={{
+                      marginLeft: '0.5rem',
+                      background: 'rgba(168, 85, 247, 0.15)',
+                      border: '1px solid rgba(168, 85, 247, 0.4)',
+                      color: '#c084fc',
+                      padding: '0.25rem 0.6rem',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      fontWeight: '600',
+                    }}
+                    title="Genera grafico ed esegue l'analisi visuale AI tramite Playwright Vision"
+                  >
+                    📊 Analizza Grafico AI
+                  </button>
 
-                    <button
-                      onClick={() => runChartAgentAnalysis(data.search_metadata.ticker)}
-                      disabled={loading}
-                      style={{
-                        marginLeft: '0.5rem',
-                        background: 'rgba(168, 85, 247, 0.15)',
-                        border: '1px solid rgba(168, 85, 247, 0.4)',
-                        color: '#c084fc',
-                        padding: '0.25rem 0.6rem',
-                        borderRadius: '6px',
-                        fontSize: '0.75rem',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                        fontWeight: '600',
-                      }}
-                      title="Genera grafico ed esegue l'analisi visuale AI tramite Playwright Vision"
-                    >
-                      📊 Analizza Grafico AI
-                    </button>
+                  {data.search_metadata.timestamp_utc && (
+                    <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#94a3b8', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      📅 Analisi del: {new Date(data.search_metadata.timestamp_utc).toLocaleString('it-IT', {
+                        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                      })}
+                    </span>
+                  )}
+                </div>
 
-                    {data.search_metadata.timestamp_utc && (
-                      <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#94a3b8', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                        📅 Analisi del: {new Date(data.search_metadata.timestamp_utc).toLocaleString('it-IT', {
-                          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                        })}
-                      </span>
-                    )}
+                <div className="summary-grid">
+                  <div className="summary-explanation">
+                    <p style={{ color: '#e2e8f0', lineHeight: 1.7, marginBottom: '0.8rem' }}>
+                      {ms?.summary_explanation}
+                    </p>
+                    <div className="expected-impact">
+                      <span className="impact-label">📌 Impatto Atteso:</span>
+                      <span className="impact-value">{ms?.expected_impact}</span>
+                    </div>
+                    <div style={{ marginTop: '0.8rem' }}>
+                      <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Sentiment Score</span>
+                      {getSentimentScoreBar(ms?.sentiment_score)}
+                    </div>
                   </div>
 
-                  <div className="summary-grid">
-                    <div className="summary-explanation">
-                      <p style={{ color: '#e2e8f0', lineHeight: 1.7, marginBottom: '0.8rem' }}>
-                        {ms?.summary_explanation}
-                      </p>
-                      <div className="expected-impact">
-                        <span className="impact-label">📌 Impatto Atteso:</span>
-                        <span className="impact-value">{ms?.expected_impact}</span>
-                      </div>
-                      <div style={{ marginTop: '0.8rem' }}>
-                        <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Sentiment Score</span>
-                        {getSentimentScoreBar(ms?.sentiment_score)}
-                      </div>
-                    </div>
-
-                    <div className="summary-highlights">
-                      <div className="highlights-title">🔑 Punti Chiave delle Notizie</div>
-                      <ul className="highlights-list">
-                        {(ms?.news_highlights || []).map((h, i) => (
-                          <li key={i} className="highlight-item">{h}</li>
-                        ))}
-                      </ul>
-                      <div className="news-count-badge">
-                        📰 {allNews.length} notizie analizzate &nbsp;|&nbsp; 🏛️ {data.search_metadata.market}
-                        {data.search_metadata.timestamp_utc && (
-                          <>
-                            &nbsp;|&nbsp; 📅 Aggiornato: {new Date(data.search_metadata.timestamp_utc).toLocaleString('it-IT', {
-                              day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                            })}
-                          </>
-                        )}
-                      </div>
+                  <div className="summary-highlights">
+                    <div className="highlights-title">🔑 Punti Chiave delle Notizie</div>
+                    <ul className="highlights-list">
+                      {(ms?.news_highlights || []).map((h, i) => (
+                        <li key={i} className="highlight-item">{h}</li>
+                      ))}
+                    </ul>
+                    <div className="news-count-badge">
+                      📰 {allNews.length} notizie analizzate &nbsp;|&nbsp; 🏛️ {data.search_metadata.market}
+                      {data.search_metadata.timestamp_utc && (
+                        <>
+                          &nbsp;|&nbsp; 📅 Aggiornato: {new Date(data.search_metadata.timestamp_utc).toLocaleString('it-IT', {
+                            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                          })}
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* 2. FULL-WIDTH INTERACTIVE CHART & VISION AI SECTION */}
+              <div className="chart-fullwidth-container" style={{ width: '100%' }}>
 
                 {/* ── INTERACTIVE CHART GUI MATCHING USER SCREENSHOT ── */}
                 {(() => {
@@ -1568,13 +1571,6 @@ export default function App() {
                               </div>
                             )}
 
-                            {cta.volume_analysis && (
-                              <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                                <strong style={{ color: '#2563eb' }}>📊 Volumi:</strong>
-                                <div style={{ marginTop: '2px', color: '#1e293b' }}>{cta.volume_analysis}</div>
-                              </div>
-                            )}
-
                             {cta.rsi_macd_summary && (
                               <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                                 <strong style={{ color: '#0284c7' }}>📉 RSI &amp; MACD:</strong>
@@ -1597,114 +1593,142 @@ export default function App() {
                     </div>
                   );
                 })()}
+              </div>
 
-                {/* NOTIZIE ULTIME 3 GIORNI */}
-                <div className="card">
-                  <div className="card-title">🗓️ Notizie Recenti (Ultimi 3 Giorni)</div>
-                  {(data.recent_news_last_3_days || []).length > 0 ? (
-                    data.recent_news_last_3_days.map((news) => (
-                      <NewsCard key={news.id} news={news} getSentimentBadge={getSentimentBadge} getImpactDot={getImpactDot} />
-                    ))
-                  ) : (
-                    <p style={{ color: '#94a3b8' }}>Nessuna notizia rilevante trovata negli ultimi 3 giorni.</p>
+              {/* 3. TWO-COLUMN GRID FOR NEWS AND SIDEBAR */}
+              <div className="grid-layout">
+                <div className="main-content">
+
+                  {/* NOTIZIE ULTIME 3 GIORNI */}
+                  <div className="card">
+                    <div className="card-title">🗓️ Notizie Recenti (Ultimi 3 Giorni)</div>
+                    {(data.recent_news_last_3_days || []).length > 0 ? (
+                      data.recent_news_last_3_days.map((news) => (
+                        <NewsCard key={news.id} news={news} getSentimentBadge={getSentimentBadge} getImpactDot={getImpactDot} />
+                      ))
+                    ) : (
+                      <p style={{ color: '#94a3b8' }}>Nessuna notizia rilevante trovata negli ultimi 3 giorni.</p>
+                    )}
+                  </div>
+
+                  {/* NOTIZIE STORICHE */}
+                  {(data.latest_available_news || []).length > 0 && (
+                    <div className="card">
+                      <div className="card-title">📁 Ultime Notizie Storiche Rilevanti</div>
+                      {data.latest_available_news.map((news) => (
+                        <NewsCard key={news.id} news={news} getSentimentBadge={getSentimentBadge} getImpactDot={getImpactDot} />
+                      ))}
+                    </div>
                   )}
                 </div>
 
-                {/* NOTIZIE STORICHE */}
-                {(data.latest_available_news || []).length > 0 && (
+                <div className="sidebar">
+                  {/* Analisti */}
                   <div className="card">
-                    <div className="card-title">📁 Ultime Notizie Storiche Rilevanti</div>
-                    {data.latest_available_news.map((news) => (
-                      <NewsCard key={news.id} news={news} getSentimentBadge={getSentimentBadge} getImpactDot={getImpactDot} />
-                    ))}
-                  </div>
-                )}
-              </div>
+                    <div className="card-title">🎯 Target Price &amp; Analisti</div>
+                    {data.search_metadata?.current_market_price && (
+                      <div style={{ padding: '0.5rem 0.8rem', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.3)', borderRadius: '8px', marginBottom: '0.8rem', fontSize: '0.82rem', color: '#38bdf8', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>📈 Prezzo Live (Yahoo Finance):</span>
+                        <strong style={{ fontSize: '0.95rem' }}>{data.search_metadata.current_market_price}</strong>
+                      </div>
+                    )}
 
-              <div className="sidebar">
-                {/* Analisti */}
-                <div className="card">
-                  <div className="card-title">🎯 Target Price &amp; Analisti</div>
-                  {data.search_metadata?.current_market_price && (
-                    <div style={{ padding: '0.5rem 0.8rem', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.3)', borderRadius: '8px', marginBottom: '0.8rem', fontSize: '0.82rem', color: '#38bdf8', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>📈 Prezzo Live (Yahoo Finance):</span>
-                      <strong style={{ fontSize: '0.95rem' }}>{data.search_metadata.current_market_price}</strong>
-                    </div>
-                  )}
-
-                  {(data.analyst_ratings_and_targets || []).length > 0
-                    ? data.analyst_ratings_and_targets.map((item, idx) => {
-                        const isHigher = item.is_target_higher || (item.upside_percent > 0);
-                        return (
-                          <div
-                            key={idx}
-                            className="analyst-row"
-                            style={{
-                              borderLeft: isHigher ? '3px solid #22c55e' : '3px solid #64748b',
-                              background: isHigher ? 'rgba(34,197,94,0.08)' : 'rgba(30,41,59,0.4)',
-                              padding: '0.65rem 0.8rem',
-                              borderRadius: '8px',
-                              marginBottom: '0.6rem'
-                            }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span className="analyst-broker"><strong>{item.broker}</strong></span>
-                              <span className="analyst-rating" style={{ background: isHigher ? 'rgba(34,197,94,0.2)' : 'rgba(100,116,139,0.2)', color: isHigher ? '#4ade80' : '#cbd5e1', padding: '0.15rem 0.5rem', borderRadius: '6px', fontSize: '0.78rem' }}>
-                                {item.rating}
-                              </span>
-                            </div>
-
-                            <div style={{ marginTop: '0.4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
-                              <div className="analyst-target" style={{ fontSize: '0.95rem', fontWeight: 'bold', color: isHigher ? '#4ade80' : '#f8fafc' }}>
-                                Target: {item.currency || ''} {item.target_price}
-                              </div>
-                              {item.upside_percent !== undefined && item.upside_percent !== null && (
-                                <span
-                                  style={{
-                                    padding: '0.2rem 0.55rem',
-                                    borderRadius: '12px',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 'bold',
-                                    background: item.upside_percent > 0 ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.2)',
-                                    color: item.upside_percent > 0 ? '#4ade80' : '#f87171',
-                                    border: item.upside_percent > 0 ? '1px solid #22c55e' : '1px solid #ef4444'
-                                  }}
-                                >
-                                  {item.upside_percent > 0 ? `🚀 Target Superiore (+${item.upside_percent}%)` : `🔻 ${item.upside_percent}%`}
+                    {(data.analyst_ratings_and_targets || []).length > 0
+                      ? data.analyst_ratings_and_targets.map((item, idx) => {
+                          const isHigher = item.is_target_higher || (item.upside_percent > 0);
+                          return (
+                            <div
+                              key={idx}
+                              className="analyst-row"
+                              style={{
+                                borderLeft: isHigher ? '3px solid #22c55e' : '3px solid #64748b',
+                                background: isHigher ? 'rgba(34,197,94,0.08)' : 'rgba(30,41,59,0.4)',
+                                padding: '0.65rem 0.8rem',
+                                borderRadius: '8px',
+                                marginBottom: '0.6rem'
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span className="analyst-broker"><strong>{item.broker}</strong></span>
+                                <span className="analyst-rating" style={{ background: isHigher ? 'rgba(34,197,94,0.2)' : 'rgba(100,116,139,0.2)', color: isHigher ? '#4ade80' : '#cbd5e1', padding: '0.15rem 0.5rem', borderRadius: '6px', fontSize: '0.78rem' }}>
+                                  {item.rating}
                                 </span>
-                              )}
+                              </div>
+
+                              <div style={{ marginTop: '0.4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
+                                <div className="analyst-target" style={{ fontSize: '0.95rem', fontWeight: 'bold', color: isHigher ? '#4ade80' : '#f8fafc' }}>
+                                  Target: {item.currency || ''} {item.target_price}
+                                </div>
+                                {item.upside_percent !== undefined && item.upside_percent !== null && (
+                                  <span
+                                    style={{
+                                      padding: '0.2rem 0.55rem',
+                                      borderRadius: '12px',
+                                      fontSize: '0.78rem',
+                                      fontWeight: 'bold',
+                                      background: item.upside_percent > 0 ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.2)',
+                                      color: item.upside_percent > 0 ? '#4ade80' : '#f87171',
+                                      border: item.upside_percent > 0 ? '1px solid #22c55e' : '1px solid #ef4444'
+                                    }}
+                                  >
+                                    {item.upside_percent > 0 ? `🚀 Target Superiore (+${item.upside_percent}%)` : `🔻 ${item.upside_percent}%`}
+                                  </span>
+                                )}
+                              </div>
+
+                              {item.note && <div className="analyst-note" style={{ fontSize: '0.8rem', color: '#cbd5e1', marginTop: '0.35rem' }}>💬 {item.note}</div>}
+                              <div className="analyst-date" style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.3rem' }}>📅 Aggiornato: {item.date}</div>
                             </div>
-
-                            {item.note && <div className="analyst-note" style={{ fontSize: '0.8rem', color: '#cbd5e1', marginTop: '0.35rem' }}>💬 {item.note}</div>}
-                            <div className="analyst-date" style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.3rem' }}>📅 Aggiornato: {item.date}</div>
-                          </div>
-                        );
-                      })
-                    : <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Nessun dato analisti disponibile.</p>}
-                </div>
-
-                {/* Livelli Tecnici */}
-                {data.technical_levels && (
-                  <div className="card">
-                    <div className="card-title">📈 Livelli Tecnici</div>
-                    <div className="tech-row">
-                      <span className="tech-label support-label">▲ Supporti</span>
-                      <span className="tech-values">{(data.technical_levels.supports || []).join(', ')}</span>
-                    </div>
-                    <div className="tech-row">
-                      <span className="tech-label resist-label">▼ Resistenze</span>
-                      <span className="tech-values">{(data.technical_levels.resistances || []).join(', ')}</span>
-                    </div>
-                    <p className="tech-notes">{data.technical_levels.critical_levels_notes}</p>
+                          );
+                        })
+                      : <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Nessun dato analisti disponibile.</p>}
                   </div>
-                )}
 
-                {/* JSON Raw Output */}
-                <div className="card">
-                  <div className="card-title">⚙️ Output JSON Multi-Agent</div>
-                  <pre className="json-preview">{JSON.stringify(data, null, 2)}</pre>
+                  {/* Livelli Tecnici */}
+                  {data.technical_levels && (
+                    <div className="card">
+                      <div className="card-title">📈 Livelli Tecnici</div>
+                      <div className="tech-row">
+                        <span className="tech-label support-label">▲ Supporti</span>
+                        <span className="tech-values">{(data.technical_levels.supports || []).join(', ')}</span>
+                      </div>
+                      <div className="tech-row">
+                        <span className="tech-label resist-label">▼ Resistenze</span>
+                        <span className="tech-values">{(data.technical_levels.resistances || []).join(', ')}</span>
+                      </div>
+                      <p className="tech-notes">{data.technical_levels.critical_levels_notes}</p>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* 4. FULL-WIDTH OUTPUT JSON AT THE VERY BOTTOM */}
+              <div className="card" style={{ marginTop: '0.5rem', width: '100%' }}>
+                <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>⚙️ Output JSON Multi-Agent</span>
+                  <button
+                    onClick={() => setShowJsonOutput(!showJsonOutput)}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      color: '#94a3b8',
+                      padding: '0.25rem 0.6rem',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      fontWeight: 600
+                    }}
+                  >
+                    {showJsonOutput ? '▲ Nascondi JSON' : '▼ Mostra JSON Raw'}
+                  </button>
+                </div>
+                {showJsonOutput && (
+                  <pre className="json-preview" style={{ marginTop: '1rem', maxHeight: '450px', overflowY: 'auto' }}>
+                    {JSON.stringify(data, null, 2)}
+                  </pre>
+                )}
+              </div>
+
             </div>
           )}
         </>
