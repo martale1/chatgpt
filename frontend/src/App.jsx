@@ -141,7 +141,7 @@ export default function App() {
   const [newTickersInput, setNewTickersInput] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [logs, setLogs] = useState([]);
-  const [sortOrder, setSortOrder] = useState('none'); // 'none', 'desc' (dall'alto al basso), 'asc' (dal basso all'alto)
+  const [sortOrder, setSortOrder] = useState('desc'); // default: score più alto prima ('desc')
 
   useEffect(() => {
     localStorage.setItem('watchlist_tickers', JSON.stringify(watchlist));
@@ -464,7 +464,7 @@ export default function App() {
     };
   });
 
-  // Ordinamento dinamico per score
+  // Ordinamento dinamico per score o ordine alfabetico
   const sortedWatchlistRows = [...watchlistRows].sort((a, b) => {
     if (sortOrder === 'desc') {
       const scoreA = a.score !== null ? a.score : -1;
@@ -475,6 +475,12 @@ export default function App() {
       const scoreA = a.score !== null ? a.score : 999;
       const scoreB = b.score !== null ? b.score : 999;
       return scoreA - scoreB;
+    }
+    if (sortOrder === 'alpha-asc') {
+      return a.ticker.localeCompare(b.ticker);
+    }
+    if (sortOrder === 'alpha-desc') {
+      return b.ticker.localeCompare(a.ticker);
     }
     return 0;
   });
@@ -569,9 +575,11 @@ export default function App() {
                   cursor: 'pointer'
                 }}
               >
-                <option value="none">Default (Ordine Watchlist)</option>
-                <option value="desc">Score: Più Alto ➔ Più Basso ⬇️</option>
+                <option value="desc">Score: Più Alto ➔ Più Basso ⬇️ (Default)</option>
                 <option value="asc">Score: Più Basso ➔ Più Alto ⬆️</option>
+                <option value="alpha-asc">Alfabetico: A ➔ Z 🔤</option>
+                <option value="alpha-desc">Alfabetico: Z ➔ A 🔤</option>
+                <option value="none">Ordine Lista Manuale</option>
               </select>
             </div>
           </div>
@@ -594,11 +602,17 @@ export default function App() {
         </div>
         <div className="watchlist-table">
           <div className="wt-thead">
-            <span>Titolo</span>
+            <span
+              onClick={() => setSortOrder(prev => prev === 'alpha-asc' ? 'alpha-desc' : 'alpha-asc')}
+              style={{ cursor: 'pointer', userSelect: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+              title="Clicca per ordinare alfabeticamente per Titolo"
+            >
+              Titolo {sortOrder === 'alpha-asc' ? '🔤 A-Z' : sortOrder === 'alpha-desc' ? '🔤 Z-A' : '↕️'}
+            </span>
             <span>Mercato</span>
             <span>Sentiment</span>
             <span
-              onClick={() => setSortOrder(prev => prev === 'none' ? 'desc' : prev === 'desc' ? 'asc' : 'none')}
+              onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
               style={{ cursor: 'pointer', userSelect: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
               title="Clicca per ordinare per Score"
             >
