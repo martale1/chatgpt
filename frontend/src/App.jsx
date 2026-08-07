@@ -258,6 +258,8 @@ export default function App() {
     } catch (e) {
       showAnalysisError('Impossibile connettersi al server bridge locale (porta 3001). Avvia node server.js.');
     }
+  };
+
   // ── Helper Promise per eseguire l'analisi live di un singolo ticker ───────
   const analyzeSingleTickerAsync = (target, index, total) => {
     return new Promise((resolve) => {
