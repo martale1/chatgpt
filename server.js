@@ -247,6 +247,49 @@ const server = http.createServer((req, meRes) => {
     }
   }
 
+  if (parsedUrl.pathname === '/api/chart-history' && req.method === 'GET') {
+    const ticker = parsedUrl.query.ticker || 'VOD.L';
+    const period = parsedUrl.query.period || '1y';
+    const days = parseInt(parsedUrl.query.days || '70');
+
+    const pythonCmd = `
+import json, yfinance as yf
+df = yf.Ticker('${ticker}').history(period='${period}').tail(${days})
+bars = []
+for date, row in df.iterrows():
+    bars.append({
+        'date': str(date.date()),
+        'open': round(float(row['Open']), 2),
+        'high': round(float(row['High']), 2),
+        'low': round(float(row['Low']), 2),
+        'close': round(float(row['Close']), 2),
+        'volume': int(row['Volume'])
+    })
+for i in range(len(bars)):
+    if i > 0:
+        prev = bars[i-1]['close']
+        curr = bars[i]['close']
+        bars[i]['change_pct'] = round(((curr - prev) / prev) * 100, 2)
+    else:
+        bars[i]['change_pct'] = 0.0
+print(json.dumps(bars))
+    `;
+
+    const pyProc = spawn(PYTHON_PATH, ['-c', pythonCmd], { shell: false });
+    let output = '';
+    pyProc.stdout.on('data', chunk => { output += chunk.toString(); });
+    pyProc.on('close', () => {
+      meRes.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      try {
+        const data = JSON.parse(output.trim());
+        meRes.end(JSON.stringify(data));
+      } catch (e) {
+        meRes.end(JSON.stringify([]));
+      }
+    });
+    return;
+  }
+
   if ((parsedUrl.pathname === '/api/analyze' || parsedUrl.pathname === '/api/analyze-stock') && req.method === 'GET') {
     const res = meRes;
     const ticker = parsedUrl.query.ticker || 'VOD.L';

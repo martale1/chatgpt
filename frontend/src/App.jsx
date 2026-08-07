@@ -171,6 +171,9 @@ export default function App() {
   const [chartTimeframe, setChartTimeframe] = useState('1a');
   const [chartType, setChartType] = useState('candlestick');
   const [chartIndicatorTab, setChartIndicatorTab] = useState('prezzo');
+  const [chartHistoryBars, setChartHistoryBars] = useState([]);
+  const [hoveredBarIndex, setHoveredBarIndex] = useState(null);
+  const [crosshairPos, setCrosshairPos] = useState(null);
 
   // ── Sincronizzazione con Server Backend (per la persistenza multi-browser) ──
   useEffect(() => {
@@ -1149,6 +1152,20 @@ export default function App() {
                   const chartData = realTickerData[query + '_CHART'] || realTickerData[data.search_metadata.ticker + '_CHART'];
                   const cta = chartData?.chart_technical_analysis;
                   
+                  // Fetch chart history for interactive hover inspection
+                  useEffect(() => {
+                    if (data?.search_metadata?.ticker) {
+                      fetch(`http://localhost:3001/api/chart-history?ticker=${data.search_metadata.ticker}&period=${chartTimeframe}`)
+                        .then(res => res.json())
+                        .then(bars => {
+                          if (Array.isArray(bars)) {
+                            setChartHistoryBars(bars);
+                          }
+                        })
+                        .catch(() => {});
+                    }
+                  }, [data?.search_metadata?.ticker, chartTimeframe]);
+
                   // Pick chart image file according to indicator tab selected
                   let chartSuffix = 'price_alligator.png';
                   if (chartIndicatorTab === 'volumi' || chartIndicatorTab === 'rsi') {
@@ -1168,6 +1185,31 @@ export default function App() {
                   const dateStr = data.search_metadata?.timestamp_utc 
                     ? new Date(data.search_metadata.timestamp_utc).toISOString().split('T')[0]
                     : new Date().toISOString().split('T')[0];
+
+                  const activeBar = (hoveredBarIndex !== null && chartHistoryBars[hoveredBarIndex])
+                    ? chartHistoryBars[hoveredBarIndex]
+                    : (chartHistoryBars.length > 0 ? chartHistoryBars[chartHistoryBars.length - 1] : null);
+
+                  const displayDate = activeBar ? activeBar.date : dateStr;
+                  const displayClose = activeBar ? `${activeBar.close} €` : (typeof currentClose === 'number' ? `${currentClose} €` : currentClose);
+                  const displayChange = activeBar ? activeBar.change_pct : -1.73;
+                  const isPos = displayChange >= 0;
+
+                  const handleMouseMove = (e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const pct = x / rect.width;
+                    setCrosshairPos(x);
+                    if (chartHistoryBars && chartHistoryBars.length > 0) {
+                      const idx = Math.min(Math.max(0, Math.floor(pct * chartHistoryBars.length)), chartHistoryBars.length - 1);
+                      setHoveredBarIndex(idx);
+                    }
+                  };
+
+                  const handleMouseLeave = () => {
+                    setCrosshairPos(null);
+                    setHoveredBarIndex(null);
+                  };
 
                   return (
                     <div className="card" style={{ border: '1px solid rgba(255, 255, 255, 0.1)', background: '#ffffff', color: '#0f172a', padding: '1.2rem', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.3)' }}>
@@ -1281,11 +1323,30 @@ export default function App() {
 
                       </div>
 
-                      {/* MAIN CHART IMAGE DISPLAY WITH OVERLAY VALUES */}
-                      <div style={{ position: 'relative', width: '100%', background: '#ffffff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', minHeight: '320px' }}>
-                        
+                      {/* MAIN CHART IMAGE DISPLAY WITH CROSSHAIR HOVER & OVERLAY VALUES */}
+                      <div
+                        onMouseMove={handleMouseMove}
+                        onMouseLeave={handleMouseLeave}
+                        style={{ position: 'relative', width: '100%', background: '#ffffff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', minHeight: '320px', cursor: 'crosshair' }}
+                      >
+                        {/* Vertical Crosshair Line on Mouse Hover */}
+                        {crosshairPos !== null && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              bottom: 0,
+                              left: `${crosshairPos}px`,
+                              width: '1px',
+                              borderLeft: '1px dashed #64748b',
+                              pointerEvents: 'none',
+                              zIndex: 20
+                            }}
+                          />
+                        )}
+
                         {/* Identified Levels Overlay Badges (Matching Screenshot) */}
-                        <div style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 10, display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'right' }}>
+                        <div style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 10, display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'right', pointerEvents: 'none' }}>
                           <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#2563eb', background: 'rgba(255,255,255,0.92)', padding: '3px 8px', borderRadius: '5px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', borderLeft: '4px solid #2563eb' }}>
                             🔵 PREZZO {currentClose}
                           </div>
@@ -1314,12 +1375,12 @@ export default function App() {
                       <div style={{ display: 'flex', gap: '1rem', marginTop: '1.2rem', flexWrap: 'wrap' }}>
                         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.6rem 1rem', flex: '1', minWidth: '130px' }}>
                           <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Data</div>
-                          <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>{dateStr}</div>
+                          <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>{displayDate}</div>
                         </div>
 
                         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.6rem 1rem', flex: '1', minWidth: '130px' }}>
                           <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Chiusura</div>
-                          <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>{currentClose}</div>
+                          <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>{displayClose}</div>
                         </div>
 
                         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.6rem 1rem', flex: '1', minWidth: '160px' }}>
@@ -1331,10 +1392,10 @@ export default function App() {
                               borderRadius: '6px',
                               fontSize: '0.9rem',
                               fontWeight: 800,
-                              background: '#fee2e2',
-                              color: '#991b1b'
+                              background: isPos ? '#dcfce7' : '#fee2e2',
+                              color: isPos ? '#15803d' : '#991b1b'
                             }}>
-                              -1.73%
+                              {isPos ? '+' : ''}{displayChange}%
                             </span>
                           </div>
                         </div>
