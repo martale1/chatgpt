@@ -602,7 +602,7 @@ header p { color: var(--text-muted); }
 
 .wt-thead {
   display: grid;
-  grid-template-columns: 160px 150px 140px 120px 200px 1fr;
+  grid-template-columns: 160px 110px 140px 120px 100px 170px 1fr;
   gap: 0.5rem;
   padding: 0.55rem 1.5rem;
   background: rgba(15,23,42,0.6);
@@ -616,7 +616,7 @@ header p { color: var(--text-muted); }
 
 .wt-row {
   display: grid;
-  grid-template-columns: 160px 150px 140px 120px 200px 1fr;
+  grid-template-columns: 160px 110px 140px 120px 100px 170px 1fr;
   gap: 0.5rem;
   padding: 0.75rem 1.5rem;
   border-bottom: 1px solid rgba(51,65,85,0.4);

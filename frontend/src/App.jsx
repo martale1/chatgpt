@@ -756,6 +756,7 @@ export default function App() {
               Titolo {sortOrder === 'alpha-asc' ? '🔤 A-Z' : sortOrder === 'alpha-desc' ? '🔤 Z-A' : '↕️'}
             </span>
             <span>Mercato</span>
+            <span>Prezzo / Target</span>
             <span>Sentiment</span>
             <span
               onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
@@ -779,11 +780,6 @@ export default function App() {
                 <span className="wt-ticker" style={{ color: row.col.text }}>
                   {row.ticker}
                   <span className="wt-company">{row.company}</span>
-                  {row.currentPrice && (
-                    <span style={{ fontSize: '0.72rem', color: '#38bdf8', marginTop: '2px', display: 'block', fontWeight: 'bold' }}>
-                      📈 {row.currentPrice}
-                    </span>
-                  )}
                   {row.timestamp && (
                     <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px', display: 'block', fontWeight: 'normal' }}>
                       📅 {row.timestamp}
@@ -791,6 +787,33 @@ export default function App() {
                   )}
                 </span>
                 <span className="wt-market">{row.market}</span>
+                <span style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  {row.currentPrice ? (
+                    <span style={{ fontSize: '0.85rem', color: '#38bdf8', fontWeight: 'bold' }}>
+                      📈 {row.currentPrice}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.78rem', color: '#64748b' }}>—</span>
+                  )}
+                  {row.bestUpsideItem && row.bestUpsideItem.upside_percent !== undefined && row.bestUpsideItem.upside_percent > 0 && (
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        padding: '0.12rem 0.4rem',
+                        borderRadius: '8px',
+                        fontSize: '0.7rem',
+                        fontWeight: 'bold',
+                        background: 'rgba(34,197,94,0.2)',
+                        color: '#4ade80',
+                        border: '1px solid #22c55e',
+                        width: 'fit-content'
+                      }}
+                      title={`Target ${row.bestUpsideItem.broker}: ${row.bestUpsideItem.target_price}`}
+                    >
+                      🚀 +{row.bestUpsideItem.upside_percent}% ({row.bestUpsideItem.target_price})
+                    </span>
+                  )}
+                </span>
                 <span>
                   <span className="wt-badge" style={{ color: row.col.text, borderColor: row.col.border }}>
                     {row.sentiment}
@@ -808,28 +831,7 @@ export default function App() {
                     <span style={{ color: '#475569', fontSize: '0.8rem' }}>—</span>
                   )}
                 </span>
-                <span className="wt-impact">
-                  {row.impact}
-                  {row.bestUpsideItem && row.bestUpsideItem.upside_percent !== undefined && row.bestUpsideItem.upside_percent > 0 && (
-                    <div style={{ marginTop: '4px' }}>
-                      <span
-                        style={{
-                          display: 'inline-block',
-                          padding: '0.15rem 0.45rem',
-                          borderRadius: '10px',
-                          fontSize: '0.72rem',
-                          fontWeight: 'bold',
-                          background: 'rgba(34,197,94,0.2)',
-                          color: '#4ade80',
-                          border: '1px solid #22c55e'
-                        }}
-                        title={`Target ${row.bestUpsideItem.broker}: ${row.bestUpsideItem.target_price}`}
-                      >
-                        🚀 Target Superiore +{row.bestUpsideItem.upside_percent}% ({row.bestUpsideItem.target_price})
-                      </span>
-                    </div>
-                  )}
-                </span>
+                <span className="wt-impact">{row.impact}</span>
                 <span style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                   <button
                     className={row.analyzed ? 'btn-secondary' : 'btn-primary'}
