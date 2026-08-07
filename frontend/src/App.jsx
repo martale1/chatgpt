@@ -1176,12 +1176,10 @@ export default function App() {
                   }
                   const chartImageUrl = `http://localhost:3001/finance_charts/${data.search_metadata.ticker}_${chartSuffix}`;
 
-                  const defaultSupport = (data?.technical_levels?.supports || [])[0] || '—';
-                  const defaultTrigger = (data?.technical_levels?.resistances || [])[0] || '—';
-
-                  const currentClose = data.search_metadata?.current_market_price || cta?.identified_levels?.current_price || '—';
-                  const triggerPrice = cta?.identified_levels?.trigger_price || (Array.isArray(cta?.chart_resistances) && cta.chart_resistances[0]) || defaultTrigger;
-                  const supportPrice = cta?.identified_levels?.support_price || (Array.isArray(cta?.chart_supports) && cta.chart_supports[0]) || defaultSupport;
+                  // Prioritize Vision AI run levels if present, otherwise fallback to news technical levels
+                  const currentClose = cta?.identified_levels?.current_price || data.search_metadata?.current_market_price || '—';
+                  const triggerPrice = cta?.identified_levels?.trigger_price || (Array.isArray(cta?.chart_resistances) && cta.chart_resistances[0]) || (data?.technical_levels?.resistances || [])[0] || '—';
+                  const supportPrice = cta?.identified_levels?.support_price || (Array.isArray(cta?.chart_supports) && cta.chart_supports[0]) || (data?.technical_levels?.supports || [])[0] || '—';
 
                   const dateStr = data.search_metadata?.timestamp_utc 
                     ? new Date(data.search_metadata.timestamp_utc).toISOString().split('T')[0]
@@ -1319,7 +1317,7 @@ export default function App() {
                             boxShadow: '0 2px 6px rgba(37,99,235,0.3)'
                           }}
                         >
-                          {loading ? '⏳ Generazione...' : '📊 Genera & Analizza Grafico AI'}
+                          {loading ? '⏳ Generazione...' : (cta ? '🔄 Rigenera Grafico AI' : '📊 Genera & Analizza Grafico AI')}
                         </button>
 
                       </div>
@@ -1337,40 +1335,69 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* MAIN CHART IMAGE DISPLAY WITH CROSSHAIR HOVER */}
-                      <div
-                        onMouseMove={handleMouseMove}
-                        onMouseLeave={handleMouseLeave}
-                        style={{ position: 'relative', width: '100%', background: '#ffffff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', minHeight: '320px', cursor: 'crosshair' }}
-                      >
-                        {/* Vertical Crosshair Line on Mouse Hover */}
-                        {crosshairPos !== null && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              bottom: 0,
-                              left: `${crosshairPos}px`,
-                              width: '1px',
-                              borderLeft: '1px dashed #64748b',
-                              pointerEvents: 'none',
-                              zIndex: 20
-                            }}
-                          />
-                        )}
+                      {/* MAIN CHART IMAGE DISPLAY WITH CROSSHAIR HOVER OR PLACEHOLDER */}
+                      {cta ? (
+                        <div
+                          onMouseMove={handleMouseMove}
+                          onMouseLeave={handleMouseLeave}
+                          style={{ position: 'relative', width: '100%', background: '#ffffff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', minHeight: '320px', cursor: 'crosshair' }}
+                        >
+                          {/* Vertical Crosshair Line on Mouse Hover */}
+                          {crosshairPos !== null && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                bottom: 0,
+                                left: `${crosshairPos}px`,
+                                width: '1px',
+                                borderLeft: '1px dashed #64748b',
+                                pointerEvents: 'none',
+                                zIndex: 20
+                              }}
+                            />
+                          )}
 
-                        <a href={chartImageUrl} target="_blank" rel="noreferrer">
-                          <img
-                            src={chartImageUrl}
-                            alt={`Grafico ${data.search_metadata.ticker}`}
-                            style={{ width: '100%', display: 'block', minHeight: '300px', objectFit: 'contain' }}
-                            onError={(e) => {
-                              e.target.onerror = null;
-                              e.target.style.display = 'none';
+                          <a href={chartImageUrl} target="_blank" rel="noreferrer">
+                            <img
+                              src={chartImageUrl}
+                              alt={`Grafico ${data.search_metadata.ticker}`}
+                              style={{ width: '100%', display: 'block', minHeight: '300px', objectFit: 'contain' }}
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.style.display = 'none';
+                              }}
+                            />
+                          </a>
+                        </div>
+                      ) : (
+                        <div style={{ padding: '2rem 1rem', textAlign: 'center', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                          <div style={{ fontSize: '1.5rem', marginBottom: '0.4rem' }}>📈</div>
+                          <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem' }}>
+                            Analisi Visuale Grafico AI non ancora eseguita per {data.search_metadata.company_name} ({data.search_metadata.ticker})
+                          </div>
+                          <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '0.3rem', marginBottom: '1.2rem' }}>
+                            Clicca sul pulsante qui sotto per avviare lo scraper Playwright, generare il grafico ad alta risoluzione ed inviarlo a ChatGPT Vision.
+                          </div>
+                          <button
+                            onClick={() => runChartAgentAnalysis(data.search_metadata.ticker)}
+                            disabled={loading}
+                            style={{
+                              background: '#2563eb',
+                              border: 'none',
+                              color: '#ffffff',
+                              padding: '0.55rem 1.3rem',
+                              borderRadius: '8px',
+                              fontWeight: 700,
+                              fontSize: '0.85rem',
+                              cursor: 'pointer',
+                              boxShadow: '0 3px 8px rgba(37,99,235,0.3)'
                             }}
-                          />
-                        </a>
-                      </div>
+                          >
+                            {loading ? '⏳ Generazione in corso...' : '📊 Genera & Analizza Grafico AI adesso'}
+                          </button>
+                        </div>
+                      )}
 
                       {/* BOTTOM SUMMARY INFO CARDS (Data, Chiusura, Variazione Giorno) MATCHING SCREENSHOT */}
                       <div style={{ display: 'flex', gap: '1rem', marginTop: '1.2rem', flexWrap: 'wrap' }}>
@@ -1406,7 +1433,7 @@ export default function App() {
                       <div style={{ marginTop: '1.2rem', padding: '1rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                         <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            🤖 Analisi Tecnica &amp; Livelli AI
+                            🤖 {cta ? 'Analisi Visuale Grafico AI (Playwright Vision)' : 'Analisi Tecnica & Livelli AI'}
                           </span>
                           <span style={{ fontSize: '0.78rem', background: cta ? '#e0e7ff' : '#f1f5f9', color: cta ? '#3730a3' : '#475569', padding: '3px 10px', borderRadius: '12px', fontWeight: 700 }}>
                             Trend: {cta?.overall_trend || ms?.overall_sentiment || 'Analizzato'}
@@ -1442,6 +1469,13 @@ export default function App() {
                             </div>
                           )}
 
+                          {cta?.rsi_macd_summary && (
+                            <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                              <strong style={{ color: '#0284c7' }}>📉 RSI &amp; MACD:</strong>
+                              <div style={{ marginTop: '2px', color: '#1e293b' }}>{cta.rsi_macd_summary}</div>
+                            </div>
+                          )}
+
                           {(cta?.key_scenario || data?.technical_levels?.critical_levels_notes) && (
                             <div style={{ gridColumn: '1 / -1', background: '#ffffff', padding: '0.8rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
                               <strong style={{ color: '#15803d' }}>🎯 Scenario Principale &amp; Note Tecniche:</strong>
@@ -1458,6 +1492,7 @@ export default function App() {
                           )}
                         </div>
                       </div>
+
                     </div>
                   );
                 })()}
