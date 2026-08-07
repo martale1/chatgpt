@@ -53,19 +53,25 @@ function parseReport(text, ticker, company) {
     throw new Error('JSON non valido nella risposta di ChatGPT: ' + e.message + '\n\nContenuto:\n' + jsonStr.slice(0, 500));
   }
 
-  // Ensure required top-level fields exist with safe defaults
-  const isItalian = ticker.endsWith('.MI');
-  const isLondon = ticker.endsWith('.L');
+  // Always strictly override metadata with authoritative info
+  const info = getCompanyInfo(ticker);
   parsed.search_metadata = parsed.search_metadata || {};
   parsed.search_metadata.ticker = ticker;
-  parsed.search_metadata.company_name = parsed.search_metadata.company_name || company;
-  parsed.search_metadata.market = parsed.search_metadata.market || (isItalian ? 'Borsa Italiana' : isLondon ? 'London Stock Exchange' : 'NASDAQ / NYSE');
-  parsed.search_metadata.timestamp_utc = parsed.search_metadata.timestamp_utc || new Date().toISOString();
+  parsed.search_metadata.company_name = info.company;
+  parsed.search_metadata.market = info.market;
+  parsed.search_metadata.timestamp_utc = new Date().toISOString();
+
   parsed.market_sentiment_summary = parsed.market_sentiment_summary || { overall_sentiment: 'Neutro', sentiment_score: 0.5, expected_impact: '', summary_explanation: '', news_highlights: [] };
   parsed.recent_news_last_3_days = parsed.recent_news_last_3_days || [];
   parsed.latest_available_news = parsed.latest_available_news || [];
   parsed.analyst_ratings_and_targets = parsed.analyst_ratings_and_targets || [];
   parsed.technical_levels = parsed.technical_levels || { supports: [], resistances: [], critical_levels_notes: '' };
+
+  // Sanity check: ensure response is not contaminated by previous company (e.g. Vodafone leaking into non-Vodafone ticker)
+  const fullText = JSON.stringify(parsed).toLowerCase();
+  if (ticker !== 'VOD.L' && (fullText.includes('vodafonethree') || fullText.includes('vodafone group'))) {
+    throw new Error(`Risposta non pertinente: ChatGPT ha incluso dati relativi a Vodafone nell'analisi di ${info.company} (${ticker}). Riprova l'analisi.`);
+  }
 
   return parsed;
 }

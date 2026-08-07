@@ -100,13 +100,25 @@ export default function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Risultati reali ricevuti da ChatGPT (persistiti in localStorage)
+  // Risultati reali ricevuti da ChatGPT (persistiti in localStorage con auto-pulizia elementi corrotti)
   const [realTickerData, setRealTickerData] = useState(() => {
     const saved = localStorage.getItem('real_ticker_data');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === 'object') return parsed;
+        if (parsed && typeof parsed === 'object') {
+          const cleaned = {};
+          for (const [key, val] of Object.entries(parsed)) {
+            const raw = JSON.stringify(val).toLowerCase();
+            // Scarta cache corrotte dove dati di Vodafone filtravano in altri titoli
+            if (key !== 'VOD.L' && (raw.includes('vodafonethree') || raw.includes('vodafone group'))) {
+              console.warn(`Pulizia cache corrotta per ${key}`);
+              continue;
+            }
+            cleaned[key] = val;
+          }
+          return cleaned;
+        }
       } catch (e) {
         console.error('Errore parsing real_ticker_data da localStorage', e);
       }
