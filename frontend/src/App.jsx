@@ -1174,20 +1174,22 @@ export default function App() {
                   let chartList = [];
                   if (chartIndicatorTab === 'tutti') {
                     chartList = [
-                      { id: 'price', title: '📈 Prezzo & Livelli Alligator (Supporti / Trigger)', url: `${baseUrl}price_alligator.png` },
-                      { id: 'momentum', title: '📊 Dashboard Volumi & Momentum (RSI, Stoch, MACD)', url: `${baseUrl}momentum.png` },
-                      { id: 'adx', title: '📉 Dashboard ADX & Forza del Trend (DI+ / DI-)', url: `${baseUrl}adx.png` },
+                      { id: 'price', title: '📈 1. Prezzo & Livelli (Candele / Alligator / Supporti & Trigger)', url: `${baseUrl}price_alligator.png` },
+                      { id: 'volume', title: '📊 2. Analisi Volumi & Medie Mobili (Vol MA5 & MA10)', url: `${baseUrl}volume.png` },
+                      { id: 'rsi', title: '📉 3. Oscillatori Momentum (RSI, Stochastic & Williams %R)', url: `${baseUrl}oscillators.png` },
+                      { id: 'macd', title: '📊 4. Trend Follower MACD (MACD, Signal & Istogramma)', url: `${baseUrl}macd.png` },
+                      { id: 'adx', title: '📈 5. Indicatori ADX & Direzionali Trend (ADX, DI+, DI-)', url: `${baseUrl}adx.png` },
                     ];
                   } else if (chartIndicatorTab === 'prezzo') {
-                    chartList = [{ id: 'price', title: '📈 Prezzo & Livelli Alligator (Supporti / Trigger)', url: `${baseUrl}price_alligator.png` }];
+                    chartList = [{ id: 'price', title: '📈 Prezzo & Livelli (Candele / Alligator / Supporti & Trigger)', url: `${baseUrl}price_alligator.png` }];
                   } else if (chartIndicatorTab === 'volumi') {
-                    chartList = [{ id: 'momentum', title: '📊 Analisi Volumi (Volume + MA10/MA5)', url: `${baseUrl}momentum.png` }];
+                    chartList = [{ id: 'volume', title: '📊 Analisi Volumi & Medie Mobili (Vol MA5 & MA10)', url: `${baseUrl}volume.png` }];
                   } else if (chartIndicatorTab === 'rsi') {
-                    chartList = [{ id: 'momentum', title: '📉 Oscillatori Momentum (RSI, Stoch, Williams %R)', url: `${baseUrl}momentum.png` }];
+                    chartList = [{ id: 'rsi', title: '📉 Oscillatori Momentum (RSI, Stochastic & Williams %R)', url: `${baseUrl}oscillators.png` }];
                   } else if (chartIndicatorTab === 'macd') {
-                    chartList = [{ id: 'momentum', title: '📊 Trend Follower MACD (MACD, Signal, Istogramma)', url: `${baseUrl}momentum.png` }];
+                    chartList = [{ id: 'macd', title: '📊 Trend Follower MACD (MACD, Signal & Istogramma)', url: `${baseUrl}macd.png` }];
                   } else if (chartIndicatorTab === 'adx') {
-                    chartList = [{ id: 'adx', title: '📈 ADX & Direzionali Trend (ADX, DI+, DI-)', url: `${baseUrl}adx.png` }];
+                    chartList = [{ id: 'adx', title: '📈 Indicatori ADX & Direzionali Trend (ADX, DI+, DI-)', url: `${baseUrl}adx.png` }];
                   }
 
                   // Levels strictly come from Vision AI run (cta). If no run executed yet, prompt user.
