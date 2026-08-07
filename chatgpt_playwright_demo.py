@@ -369,21 +369,20 @@ def run_in_page(page, prompt, login_only):
 
 
 def build_chart_prompt(company, ticker, market, snapshot):
+    close_val = snapshot.get('close', 0)
+    sup_val = snapshot.get('support_30', snapshot.get('support_10', 0))
+    res_val = snapshot.get('resistance_10', 0)
     return f"""Analizza i grafici tecnici allegati del titolo {company} ({ticker}).
 
 Dati numerici calcolati dal codice:
 - Data ultima barra: {snapshot.get('date', 'N/D')}
-- Prezzo Chiusura: {snapshot.get('close', 0):.4f}
+- Prezzo Chiusura (PREZZO): {close_val:.2f}
+- Variazione 1D: {snapshot.get('change_1d_pct', 0):+.2f}%
+- Supposto Supporto Chiave (SUPPORTO): {sup_val:.2f}
+- Supposta Resistenza / Breakout (TRIGGER): {res_val:.2f}
 - RSI (14): {snapshot.get('rsi', 0):.2f}
-- MACD: {snapshot.get('macd', 0):.4f}
-- MACD Signal: {snapshot.get('macd_signal', 0):.4f}
-- ADX: {snapshot.get('adx', 0):.2f}
-- DI+: {snapshot.get('plus_di', 0):.2f}
-- DI-: {snapshot.get('minus_di', 0):.2f}
-- Supporto a breve (10d): {snapshot.get('support_10', 0):.4f}
-- Supporto a medio (30d): {snapshot.get('support_30', 0):.4f}
-- Resistenza a breve (10d): {snapshot.get('resistance_10', 0):.4f}
-- Resistenza a medio (30d): {snapshot.get('resistance_30', 0):.4f}
+- MACD: {snapshot.get('macd', 0):.4f} | Signal: {snapshot.get('macd_signal', 0):.4f}
+- ADX: {snapshot.get('adx', 0):.2f} | DI+: {snapshot.get('plus_di', 0):.2f} | DI-: {snapshot.get('minus_di', 0):.2f}
 
 Rispondi ESCLUSIVAMENTE con un blocco di codice JSON valido strutturato cosi:
 
@@ -395,14 +394,20 @@ Rispondi ESCLUSIVAMENTE con un blocco di codice JSON valido strutturato cosi:
     "ticker": "{ticker}",
     "market": "{market}",
     "analysis_type": "chart_ai",
+    "current_market_price": {close_val:.2f},
     "timestamp_utc": "{snapshot.get('date', '')}"
   }},
   "chart_technical_analysis": {{
     "overall_trend": "[Rialzista / Ribassista / Neutro / Consolidamento]",
     "candlestick_pattern": "[descrizione visiva del pattern recente es. Hammer, Engulfing, Doji, Breakout]",
     "volume_analysis": "[lettura visiva dei volumi rispetto alla media sui picchi di prezzo]",
-    "chart_supports": ["{snapshot.get('support_10', 0):.2f} €", "{snapshot.get('support_30', 0):.2f} €"],
-    "chart_resistances": ["{snapshot.get('resistance_10', 0):.2f} €", "{snapshot.get('resistance_30', 0):.2f} €"],
+    "identified_levels": {{
+      "current_price": "{close_val:.2f}",
+      "trigger_price": "{res_val:.2f}",
+      "support_price": "{sup_val:.2f}"
+    }},
+    "chart_supports": ["{sup_val:.2f} €", "{snapshot.get('support_10', 0):.2f} €"],
+    "chart_resistances": ["{res_val:.2f} €", "{snapshot.get('resistance_30', 0):.2f} €"],
     "rsi_macd_summary": "[sintesi visiva di RSI e incroci MACD sul grafico]",
     "key_scenario": "[Scenario principale e livello di conferma per eventuale entrata/uscita]",
     "operational_note": "[max 3 righe con indicazione prudente per il trader]"
@@ -412,18 +417,18 @@ Rispondi ESCLUSIVAMENTE con un blocco di codice JSON valido strutturato cosi:
 
 Regole:
 - Rispondi SOLO ed ESCLUSIVAMENTE con il blocco ```json``` senza alcun altro testo prima o dopo.
-- Analizza attentamente sia l'immagine del grafico che i dati numerici forniti sopra."""
+- Identifica chiaramente il PREZZO, il TRIGGER e il SUPPORTO nel grafico allegato."""
 
 
-def run_chart_report(context, stock):
-    safe_print(f"\n=== Generazione & Analisi Grafico AI: {stock['company']} ({stock['ticker']}) ===")
+def run_chart_report(context, stock, period="1y", days=70, chart_type="candlestick"):
+    safe_print(f"\n=== Generazione & Analisi Grafico AI: {stock['company']} ({stock['ticker']}) [Period: {period}, Days: {days}, Type: {chart_type}] ===")
     output_dir = Path("finance_charts")
     output_dir.mkdir(exist_ok=True)
     snapshot = {}
     chart_file = None
     try:
         from finance_charts.technical_charts import create_chart_bundle
-        bundle = create_chart_bundle(stock["ticker"], output_dir)
+        bundle = create_chart_bundle(stock["ticker"], output_dir, period=period, days=days, chart_type=chart_type)
         snapshot = bundle.get("snapshot", {})
         if bundle.get("files") and len(bundle["files"]) > 0:
             chart_file = bundle["files"][0]

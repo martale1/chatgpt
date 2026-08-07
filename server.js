@@ -262,6 +262,10 @@ const server = http.createServer((req, meRes) => {
     
     res.write(`data: ${JSON.stringify({ type: 'log', agent: 'Controller & Orchestrator Agent', msg: `Avvio dello scraper Playwright (${isChart ? 'Analisi Grafico AI' : 'Analisi News'}) per il ticker: ${ticker}` })}\n\n`);
 
+    const period = parsedUrl.query.period || '1y';
+    const days = parsedUrl.query.days || '70';
+    const chartType = parsedUrl.query.chart_type || 'candlestick';
+
     const args = [
       path.join(__dirname, 'chatgpt_playwright_demo.py'),
       '--ticker', ticker,

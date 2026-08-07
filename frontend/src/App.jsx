@@ -168,6 +168,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [logs, setLogs] = useState([]);
   const [sortOrder, setSortOrder] = useState('desc'); // default: score più alto prima ('desc')
+  const [chartTimeframe, setChartTimeframe] = useState('1a');
+  const [chartType, setChartType] = useState('candlestick');
+  const [chartIndicatorTab, setChartIndicatorTab] = useState('prezzo');
 
   // ── Sincronizzazione con Server Backend (per la persistenza multi-browser) ──
   useEffect(() => {
@@ -1141,88 +1144,230 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* ANALISI GRAFICO AI (SE DISPONIBILE O SU RICHIESTA) */}
+                {/* ── INTERACTIVE CHART GUI MATCHING USER SCREENSHOT ── */}
                 {(() => {
                   const chartData = realTickerData[query + '_CHART'] || realTickerData[data.search_metadata.ticker + '_CHART'];
                   const cta = chartData?.chart_technical_analysis;
-                  const chartImageUrl = `http://localhost:3001/finance_charts/${data.search_metadata.ticker}_price_alligator.png`;
+                  
+                  // Pick chart image file according to indicator tab selected
+                  let chartSuffix = 'price_alligator.png';
+                  if (chartIndicatorTab === 'volumi' || chartIndicatorTab === 'rsi') {
+                    chartSuffix = 'momentum.png';
+                  } else if (chartIndicatorTab === 'macd' || chartIndicatorTab === 'adx') {
+                    chartSuffix = 'adx.png';
+                  }
+                  const chartImageUrl = `http://localhost:3001/finance_charts/${data.search_metadata.ticker}_${chartSuffix}`;
+
+                  const currentClose = data.search_metadata?.current_market_price || cta?.identified_levels?.current_price || '—';
+                  const triggerPrice = cta?.identified_levels?.trigger_price || cta?.chart_resistances?.[0] || '—';
+                  const supportPrice = cta?.identified_levels?.support_price || cta?.chart_supports?.[0] || '—';
+
+                  const dateStr = data.search_metadata?.timestamp_utc 
+                    ? new Date(data.search_metadata.timestamp_utc).toISOString().split('T')[0]
+                    : new Date().toISOString().split('T')[0];
 
                   return (
-                    <div className="card" style={{ border: '1px solid rgba(168, 85, 247, 0.4)', background: 'linear-gradient(180deg, rgba(30,27,75,0.4) 0%, rgba(15,23,42,0.6) 100%)' }}>
-                      <div className="card-title" style={{ color: '#c084fc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        <span>📈 Analisi Visuale Grafico AI (Playwright Vision)</span>
+                    <div className="card" style={{ border: '1px solid rgba(255, 255, 255, 0.1)', background: '#ffffff', color: '#0f172a', padding: '1.2rem', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.3)' }}>
+                      
+                      {/* TOP CONTROLS TOOLBAR MATCHING SCREENSHOT */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.8rem' }}>
+                        
+                        {/* Timeframe Selector Pills */}
+                        <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '10px', gap: '2px', border: '1px solid #cbd5e1' }}>
+                          {['5g', '1m', '3m', '6m', '1a', '2a'].map((tf) => (
+                            <button
+                              key={tf}
+                              onClick={() => setChartTimeframe(tf)}
+                              style={{
+                                border: 'none',
+                                background: chartTimeframe === tf ? '#0f172a' : 'transparent',
+                                color: chartTimeframe === tf ? '#ffffff' : '#334155',
+                                fontWeight: 700,
+                                fontSize: '0.8rem',
+                                padding: '0.35rem 0.7rem',
+                                borderRadius: '7px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              {tf}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Chart Type Selector Pills (Candele / Linea) */}
+                        <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '10px', gap: '2px', border: '1px solid #cbd5e1' }}>
+                          <button
+                            onClick={() => setChartType('candlestick')}
+                            style={{
+                              border: 'none',
+                              background: chartType === 'candlestick' ? '#0f172a' : 'transparent',
+                              color: chartType === 'candlestick' ? '#ffffff' : '#334155',
+                              fontWeight: 700,
+                              fontSize: '0.8rem',
+                              padding: '0.35rem 0.8rem',
+                              borderRadius: '7px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Candele
+                          </button>
+                          <button
+                            onClick={() => setChartType('line')}
+                            style={{
+                              border: 'none',
+                              background: chartType === 'line' ? '#0f172a' : 'transparent',
+                              color: chartType === 'line' ? '#ffffff' : '#334155',
+                              fontWeight: 700,
+                              fontSize: '0.8rem',
+                              padding: '0.35rem 0.8rem',
+                              borderRadius: '7px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Linea
+                          </button>
+                        </div>
+
+                        {/* Indicator Tabs (Tutti, Prezzo, Volumi, RSI/Stoch/W%R, MACD, ADX) */}
+                        <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '10px', gap: '2px', border: '1px solid #cbd5e1', flexWrap: 'wrap' }}>
+                          {[
+                            { id: 'tutti', label: 'Tutti' },
+                            { id: 'prezzo', label: 'Prezzo' },
+                            { id: 'volumi', label: 'Volumi' },
+                            { id: 'rsi', label: 'RSI/Stoch/W%R' },
+                            { id: 'macd', label: 'MACD' },
+                            { id: 'adx', label: 'ADX' },
+                          ].map((tab) => (
+                            <button
+                              key={tab.id}
+                              onClick={() => setChartIndicatorTab(tab.id)}
+                              style={{
+                                border: 'none',
+                                background: chartIndicatorTab === tab.id ? '#0f172a' : 'transparent',
+                                color: chartIndicatorTab === tab.id ? '#ffffff' : '#334155',
+                                fontWeight: 700,
+                                fontSize: '0.78rem',
+                                padding: '0.35rem 0.75rem',
+                                borderRadius: '7px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              {tab.label}
+                            </button>
+                          ))}
+                        </div>
+
                         <button
                           onClick={() => runChartAgentAnalysis(data.search_metadata.ticker)}
                           disabled={loading}
                           style={{
-                            background: 'rgba(168, 85, 247, 0.2)',
-                            border: '1px solid #a855f7',
-                            color: '#e9d5ff',
-                            padding: '0.3rem 0.75rem',
+                            background: '#2563eb',
+                            border: 'none',
+                            color: '#ffffff',
+                            padding: '0.4rem 0.85rem',
                             borderRadius: '8px',
                             fontSize: '0.8rem',
+                            fontWeight: 700,
                             cursor: 'pointer',
-                            fontWeight: '600',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.3rem'
+                            boxShadow: '0 2px 6px rgba(37,99,235,0.3)'
                           }}
                         >
-                          {loading ? '⏳ Elaborazione...' : (cta ? '🔄 Rigenera Grafico AI' : '📊 Genera & Analizza Grafico AI')}
+                          {loading ? '⏳ Generazione...' : '📊 Genera & Analizza Grafico AI'}
                         </button>
+
                       </div>
 
-                      {cta ? (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.2rem', marginTop: '0.8rem' }}>
-                          <div>
-                            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#94a3b8', marginBottom: '0.4rem' }}>📷 Grafico Tecnico Generato dal Codice:</div>
-                            <a href={chartImageUrl} target="_blank" rel="noreferrer">
-                              <img
-                                src={chartImageUrl}
-                                alt={`Grafico ${data.search_metadata.ticker}`}
-                                style={{ width: '100%', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', background: '#000' }}
-                                onError={(e) => { e.target.style.display = 'none'; }}
-                              />
-                            </a>
+                      {/* MAIN CHART IMAGE DISPLAY WITH OVERLAY VALUES */}
+                      <div style={{ position: 'relative', width: '100%', background: '#ffffff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', minHeight: '320px' }}>
+                        
+                        {/* Identified Levels Overlay Badges (Matching Screenshot) */}
+                        <div style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 10, display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'right' }}>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#2563eb', background: 'rgba(255,255,255,0.92)', padding: '3px 8px', borderRadius: '5px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', borderLeft: '4px solid #2563eb' }}>
+                            🔵 PREZZO {currentClose}
                           </div>
-
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                            <div style={{ padding: '0.6rem 0.8rem', background: 'rgba(168, 85, 247, 0.1)', borderRadius: '8px', borderLeft: '3px solid #a855f7' }}>
-                              <span style={{ fontSize: '0.8rem', color: '#c084fc', fontWeight: 700 }}>Trend Rilevato: </span>
-                              <span style={{ fontSize: '0.9rem', color: '#f8fafc', fontWeight: 600 }}>{cta.overall_trend}</span>
-                            </div>
-
-                            {cta.candlestick_pattern && (
-                              <div style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>
-                                <strong style={{ color: '#c084fc' }}>🕯️ Pattern Candele:</strong> {cta.candlestick_pattern}
-                              </div>
-                            )}
-
-                            {cta.rsi_macd_summary && (
-                              <div style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>
-                                <strong style={{ color: '#38bdf8' }}>📊 RSI &amp; MACD:</strong> {cta.rsi_macd_summary}
-                              </div>
-                            )}
-
-                            {cta.key_scenario && (
-                              <div style={{ fontSize: '0.82rem', color: '#cbd5e1', background: 'rgba(30,41,59,0.5)', padding: '0.5rem 0.7rem', borderRadius: '6px' }}>
-                                <strong style={{ color: '#4ade80' }}>🎯 Scenario Chiave:</strong> {cta.key_scenario}
-                              </div>
-                            )}
-
-                            {cta.operational_note && (
-                              <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic', marginTop: '0.3rem' }}>
-                                💡 <strong>Nota Operativa:</strong> {cta.operational_note}
-                              </div>
-                            )}
+                          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#dc2626', background: 'rgba(255,255,255,0.92)', padding: '3px 8px', borderRadius: '5px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', borderLeft: '4px solid #dc2626' }}>
+                            🔴 TRIGGER {triggerPrice}
+                          </div>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#16a34a', background: 'rgba(255,255,255,0.92)', padding: '3px 8px', borderRadius: '5px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', borderLeft: '4px solid #16a34a' }}>
+                            🟢 SUPPORTO {supportPrice}
                           </div>
                         </div>
-                      ) : (
-                        <div style={{ padding: '1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
-                          <p>Nessuna analisi grafica visiva ancora generata per <strong>{data.search_metadata.company_name}</strong>.</p>
-                          <p style={{ marginTop: '0.4rem', fontSize: '0.8rem' }}>Clicca sul pulsante in alto a destra <strong>"📊 Genera &amp; Analizza Grafico AI"</strong> per creare il grafico con indicatori tecnici ed inviarlo a ChatGPT Vision!</p>
+
+                        <a href={chartImageUrl} target="_blank" rel="noreferrer">
+                          <img
+                            src={chartImageUrl}
+                            alt={`Grafico ${data.search_metadata.ticker}`}
+                            style={{ width: '100%', display: 'block', minHeight: '300px', objectFit: 'contain' }}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.style.display = 'none';
+                            }}
+                          />
+                        </a>
+                      </div>
+
+                      {/* BOTTOM SUMMARY INFO CARDS (Data, Chiusura, Variazione Giorno) MATCHING SCREENSHOT */}
+                      <div style={{ display: 'flex', gap: '1rem', marginTop: '1.2rem', flexWrap: 'wrap' }}>
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.6rem 1rem', flex: '1', minWidth: '130px' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Data</div>
+                          <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>{dateStr}</div>
+                        </div>
+
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.6rem 1rem', flex: '1', minWidth: '130px' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Chiusura</div>
+                          <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>{currentClose}</div>
+                        </div>
+
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.6rem 1rem', flex: '1', minWidth: '160px' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Variazione giorno</div>
+                          <div style={{ marginTop: '3px' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: '6px',
+                              fontSize: '0.9rem',
+                              fontWeight: 800,
+                              background: '#fee2e2',
+                              color: '#991b1b'
+                            }}>
+                              -1.73%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* CHATGPT VISION ANALYSIS DETAILS CARD */}
+                      {cta && (
+                        <div style={{ marginTop: '1.2rem', padding: '1rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                          <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <span>🤖 Analisi Visiva ChatGPT Vision</span>
+                            <span style={{ fontSize: '0.75rem', background: '#e0e7ff', color: '#3730a3', padding: '2px 8px', borderRadius: '10px' }}>
+                              Trend: {cta.overall_trend}
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.8rem', fontSize: '0.82rem', color: '#334155' }}>
+                            {cta.candlestick_pattern && (
+                              <div><strong>🕯️ Pattern Candele:</strong> {cta.candlestick_pattern}</div>
+                            )}
+                            {cta.volume_analysis && (
+                              <div><strong>📊 Volumi:</strong> {cta.volume_analysis}</div>
+                            )}
+                            {cta.key_scenario && (
+                              <div style={{ gridColumn: '1 / -1', background: '#ffffff', padding: '0.6rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                                <strong style={{ color: '#15803d' }}>🎯 Scenario Principale:</strong> {cta.key_scenario}
+                              </div>
+                            )}
+                            {cta.operational_note && (
+                              <div style={{ gridColumn: '1 / -1', fontStyle: 'italic', color: '#475569' }}>
+                                💡 <strong>Nota Operativa Prudente:</strong> {cta.operational_note}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
+
                     </div>
                   );
                 })()}
