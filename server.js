@@ -11,6 +11,7 @@ const PYTHON_PATH = "C:\\Users\\theoi\\AppData\\Local\\Microsoft\\WindowsApps\\p
 function getCompanyInfo(ticker) {
   const clean = ticker.trim().toUpperCase();
   const catalog = {
+    "PST.MI": { company: "Poste Italiane", market: "Borsa Italiana" },
     "TEN.MI": { company: "Tenaris", market: "Borsa Italiana" },
     "PRY.MI": { company: "Prysmian", market: "Borsa Italiana" },
     "LDO.MI": { company: "Leonardo", market: "Borsa Italiana" },

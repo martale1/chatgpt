@@ -27,6 +27,7 @@ DEFAULT_TICKER = "VOD.L"
 DEFAULT_MARKET = "London Stock Exchange"
 DEFAULT_STOCKS = ["VOD.L"]#,"NEXI.MI","AVIO.MI","A2A.MI"]
 STOCK_CATALOG = {
+    "PST.MI": {"company": "Poste Italiane", "market": "Borsa Italiana"},
     "TEN.MI": {"company": "Tenaris", "market": "Borsa Italiana"},
     "PRY.MI": {"company": "Prysmian", "market": "Borsa Italiana"},
     "LDO.MI": {"company": "Leonardo", "market": "Borsa Italiana"},
