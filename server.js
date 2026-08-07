@@ -115,33 +115,134 @@ function parseReport(text, ticker, company) {
 }
 
 
-// Create HTTP server
-const server = http.createServer((req, res) => {
-  // CORS Headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+// ── Server-Side File Cache Persistence ──────────────────────────────────────
+const CACHE_DIR = path.join(__dirname, 'cache');
+const TICKERS_DIR = path.join(CACHE_DIR, 'tickers');
+const WATCHLISTS_FILE = path.join(CACHE_DIR, 'watchlists.json');
+const ALL_TICKERS_FILE = path.join(CACHE_DIR, 'all_tickers.json');
 
+if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+if (!fs.existsSync(TICKERS_DIR)) fs.mkdirSync(TICKERS_DIR, { recursive: true });
+
+function saveTickerAnalysis(ticker, data) {
+  try {
+    const t = ticker.toUpperCase();
+    const filePath = path.join(TICKERS_DIR, `${t}.json`);
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+
+    let all = {};
+    if (fs.existsSync(ALL_TICKERS_FILE)) {
+      try { all = JSON.parse(fs.readFileSync(ALL_TICKERS_FILE, 'utf8')); } catch (e) {}
+    }
+    all[t] = data;
+    fs.writeFileSync(ALL_TICKERS_FILE, JSON.stringify(all, null, 2), 'utf8');
+  } catch (e) {
+    console.error(`Errore salvataggio cache per ${ticker}:`, e);
+  }
+}
+
+function loadAllTickerAnalyses() {
+  const result = {};
+  if (fs.existsSync(ALL_TICKERS_FILE)) {
+    try {
+      return JSON.parse(fs.readFileSync(ALL_TICKERS_FILE, 'utf8'));
+    } catch (e) {}
+  }
+  if (fs.existsSync(TICKERS_DIR)) {
+    const files = fs.readdirSync(TICKERS_DIR);
+    files.forEach(file => {
+      if (file.endsWith('.json')) {
+        try {
+          const content = fs.readFileSync(path.join(TICKERS_DIR, file), 'utf8');
+          const parsed = JSON.parse(content);
+          const t = file.replace('.json', '').toUpperCase();
+          result[t] = parsed;
+        } catch (e) {}
+      }
+    });
+  }
+  return result;
+}
+
+function saveWatchlists(data) {
+  try {
+    fs.writeFileSync(WATCHLISTS_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (e) {}
+}
+
+function loadWatchlists() {
+  if (fs.existsSync(WATCHLISTS_FILE)) {
+    try {
+      return JSON.parse(fs.readFileSync(WATCHLISTS_FILE, 'utf8'));
+    } catch (e) {}
+  }
+  return null;
+}
+
+
+// Create HTTP server
+const server = http.createServer((req, meRes) => {
+  const parsedUrl = url.parse(req.url, true);
+
+  // Set CORS headers for all requests
   if (req.method === 'OPTIONS') {
-    res.writeHead(204);
-    res.end();
+    meRes.writeHead(200, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type'
+    });
+    meRes.end();
     return;
   }
 
-  const parsedUrl = url.parse(req.url, true);
-  
-  if (parsedUrl.pathname === '/api/analyze') {
-    const ticker = parsedUrl.query.ticker || 'AVIO.MI';
+  // API: Get all server-persisted data (analyses & watchlists)
+  if (parsedUrl.pathname === '/api/all-data' && req.method === 'GET') {
+    meRes.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    });
+    const analyses = loadAllTickerAnalyses();
+    const watchlists = loadWatchlists();
+    meRes.end(JSON.stringify({ tickerData: analyses, watchlists: watchlists }));
+    return;
+  }
+
+  // API: Save watchlists to server disk
+  if (parsedUrl.pathname === '/api/save-watchlists' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const parsed = JSON.parse(body);
+        saveWatchlists(parsed);
+        meRes.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        });
+        meRes.end(JSON.stringify({ status: 'ok' }));
+      } catch (e) {
+        meRes.writeHead(400, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        });
+        meRes.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  if (parsedUrl.pathname === '/api/analyze-stock' && req.method === 'GET') {
+    const res = meRes;
+    const ticker = parsedUrl.query.ticker || 'VOD.L';
     const info = getCompanyInfo(ticker);
-    
-    // Set headers for SSE (Server-Sent Events)
+
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
-      'X-Accel-Buffering': 'no' // disable buffering for proxy servers
+      'Access-Control-Allow-Origin': '*'
     });
-
+    
     res.write(`data: ${JSON.stringify({ type: 'log', agent: 'Controller & Orchestrator Agent', msg: `Avvio dello scraper Playwright per il ticker: ${ticker}` })}\n\n`);
 
     const args = [
@@ -198,6 +299,7 @@ const server = http.createServer((req, res) => {
         }
 
         const parsedData = parseReport(chatGptResponse, ticker.trim().toUpperCase(), info.company);
+        saveTickerAnalysis(ticker.trim().toUpperCase(), parsedData);
         res.write(`data: ${JSON.stringify({ type: 'data', data: parsedData })}\n\n`);
       } catch (err) {
         res.write(`data: ${JSON.stringify({ type: 'error', msg: `Errore parsing report: ${err.message}` })}\n\n`);
@@ -207,8 +309,8 @@ const server = http.createServer((req, res) => {
     });
 
   } else {
-    res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('Not Found');
+    meRes.writeHead(404, { 'Content-Type': 'text/plain' });
+    meRes.end('Not Found');
   }
 });
 
