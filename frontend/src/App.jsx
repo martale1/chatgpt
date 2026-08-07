@@ -1158,9 +1158,12 @@ export default function App() {
                   }
                   const chartImageUrl = `http://localhost:3001/finance_charts/${data.search_metadata.ticker}_${chartSuffix}`;
 
+                  const defaultSupport = (data?.technical_levels?.supports || [])[0] || '—';
+                  const defaultTrigger = (data?.technical_levels?.resistances || [])[0] || '—';
+
                   const currentClose = data.search_metadata?.current_market_price || cta?.identified_levels?.current_price || '—';
-                  const triggerPrice = cta?.identified_levels?.trigger_price || cta?.chart_resistances?.[0] || '—';
-                  const supportPrice = cta?.identified_levels?.support_price || cta?.chart_supports?.[0] || '—';
+                  const triggerPrice = cta?.identified_levels?.trigger_price || (Array.isArray(cta?.chart_resistances) && cta.chart_resistances[0]) || defaultTrigger;
+                  const supportPrice = cta?.identified_levels?.support_price || (Array.isArray(cta?.chart_supports) && cta.chart_supports[0]) || defaultSupport;
 
                   const dateStr = data.search_metadata?.timestamp_utc 
                     ? new Date(data.search_metadata.timestamp_utc).toISOString().split('T')[0]
@@ -1337,40 +1340,62 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* CHATGPT VISION ANALYSIS DETAILS CARD */}
-                      {cta && (
-                        <div style={{ marginTop: '1.2rem', padding: '1rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                          <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <span>🤖 Analisi Visiva ChatGPT Vision</span>
-                            <span style={{ fontSize: '0.75rem', background: '#e0e7ff', color: '#3730a3', padding: '2px 8px', borderRadius: '10px' }}>
-                              Trend: {cta.overall_trend}
-                            </span>
-                          </div>
-
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.8rem', fontSize: '0.82rem', color: '#334155' }}>
-                            {cta.candlestick_pattern && (
-                              <div><strong>🕯️ Pattern Candele:</strong> {cta.candlestick_pattern}</div>
-                            )}
-                            {cta.volume_analysis && (
-                              <div><strong>📊 Volumi:</strong> {cta.volume_analysis}</div>
-                            )}
-                            {cta.key_scenario && (
-                              <div style={{ gridColumn: '1 / -1', background: '#ffffff', padding: '0.6rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                                <strong style={{ color: '#15803d' }}>🎯 Scenario Principale:</strong> {cta.key_scenario}
-                              </div>
-                            )}
-                            {cta.operational_note && (
-                              <div style={{ gridColumn: '1 / -1', fontStyle: 'italic', color: '#475569' }}>
-                                💡 <strong>Nota Operativa Prudente:</strong> {cta.operational_note}
-                              </div>
-                            )}
-                          </div>
+                      {/* CHATGPT VISION & TECHNICAL ANALYSIS DETAILS CARD */}
+                      <div style={{ marginTop: '1.2rem', padding: '1rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            🤖 Analisi Tecnica &amp; Livelli AI
+                          </span>
+                          <span style={{ fontSize: '0.78rem', background: cta ? '#e0e7ff' : '#f1f5f9', color: cta ? '#3730a3' : '#475569', padding: '3px 10px', borderRadius: '12px', fontWeight: 700 }}>
+                            Trend: {cta?.overall_trend || ms?.overall_sentiment || 'Analizzato'}
+                          </span>
                         </div>
-                      )}
 
-                    </div>
-                  );
-                })()}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.9rem', fontSize: '0.84rem', color: '#334155' }}>
+                          <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', borderLeft: '4px solid #16a34a', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                            <strong style={{ color: '#16a34a' }}>🟢 Livelli di Supporto (S1, S2):</strong>
+                            <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
+                              {cta?.chart_supports?.join(', ') || (data?.technical_levels?.supports || []).join(', ') || supportPrice}
+                            </div>
+                          </div>
+
+                          <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', borderLeft: '4px solid #dc2626', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                            <strong style={{ color: '#dc2626' }}>🔴 Resistenze / Trigger (R1, R2):</strong>
+                            <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
+                              {cta?.chart_resistances?.join(', ') || (data?.technical_levels?.resistances || []).join(', ') || triggerPrice}
+                            </div>
+                          </div>
+
+                          {cta?.candlestick_pattern && (
+                            <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                              <strong style={{ color: '#a855f7' }}>🕯️ Pattern Candele:</strong>
+                              <div style={{ marginTop: '2px', color: '#1e293b' }}>{cta.candlestick_pattern}</div>
+                            </div>
+                          )}
+
+                          {cta?.volume_analysis && (
+                            <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                              <strong style={{ color: '#2563eb' }}>📊 Volumi:</strong>
+                              <div style={{ marginTop: '2px', color: '#1e293b' }}>{cta.volume_analysis}</div>
+                            </div>
+                          )}
+
+                          {(cta?.key_scenario || data?.technical_levels?.critical_levels_notes) && (
+                            <div style={{ gridColumn: '1 / -1', background: '#ffffff', padding: '0.8rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                              <strong style={{ color: '#15803d' }}>🎯 Scenario Principale &amp; Note Tecniche:</strong>
+                              <div style={{ marginTop: '4px', color: '#0f172a', lineHeight: 1.5 }}>
+                                {cta?.key_scenario || data?.technical_levels?.critical_levels_notes}
+                              </div>
+                            </div>
+                          )}
+
+                          {cta?.operational_note && (
+                            <div style={{ gridColumn: '1 / -1', fontStyle: 'italic', color: '#475569', background: '#f1f5f9', padding: '0.6rem 0.8rem', borderRadius: '8px' }}>
+                              💡 <strong>Nota Operativa Prudente:</strong> {cta.operational_note}
+                            </div>
+                          )}
+                        </div>
+                      </div>
 
                 {/* NOTIZIE ULTIME 3 GIORNI */}
                 <div className="card">
