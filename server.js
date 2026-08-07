@@ -11,16 +11,36 @@ const PYTHON_PATH = "C:\\Users\\theoi\\AppData\\Local\\Microsoft\\WindowsApps\\p
 function getCompanyInfo(ticker) {
   const clean = ticker.trim().toUpperCase();
   const catalog = {
+    "TEN.MI": { company: "Tenaris", market: "Borsa Italiana" },
+    "PRY.MI": { company: "Prysmian", market: "Borsa Italiana" },
+    "LDO.MI": { company: "Leonardo", market: "Borsa Italiana" },
+    "MONC.MI": { company: "Moncler", market: "Borsa Italiana" },
+    "DIA.MI": { company: "DiaSorin", market: "Borsa Italiana" },
+    "CPR.MI": { company: "Campari", market: "Borsa Italiana" },
+    "ENEL.MI": { company: "Enel", market: "Borsa Italiana" },
+    "ENI.MI": { company: "Eni", market: "Borsa Italiana" },
+    "SRG.MI": { company: "Snam", market: "Borsa Italiana" },
+    "STMMI.MI": { company: "STMicroelectronics", market: "Borsa Italiana" },
+    "STLAM.MI": { company: "Stellantis", market: "Borsa Italiana" },
+    "BC.MI": { company: "Banca Generali", market: "Borsa Italiana" },
+    "BAMI.MI": { company: "Banco BPM", market: "Borsa Italiana" },
+    "ISP.MI": { company: "Intesa Sanpaolo", market: "Borsa Italiana" },
+    "UCG.MI": { company: "UniCredit", market: "Borsa Italiana" },
+    "G.MI": { company: "Assicurazioni Generali", market: "Borsa Italiana" },
+    "TIT.MI": { company: "Telecom Italia", market: "Borsa Italiana" },
+    "RACE.MI": { company: "Ferrari", market: "Borsa Italiana" },
     "VOD.L": { company: "Vodafone", market: "London Stock Exchange" },
     "A2A.MI": { company: "A2A", market: "Borsa Italiana" },
     "AVIO.MI": { company: "Avio", market: "Borsa Italiana" },
-    "STLAM.MI": { company: "Stellantis", market: "Borsa Italiana" },
-    "ISP.MI": { company: "Intesa Sanpaolo", market: "Borsa Italiana" },
-    "UCG.MI": { company: "UniCredit", market: "Borsa Italiana" },
     "TSLA": { company: "Tesla", market: "NASDAQ" },
     "AAPL": { company: "Apple", market: "NASDAQ" },
     "NVDA": { company: "NVIDIA", market: "NASDAQ" },
-    "MSFT": { company: "Microsoft", market: "NASDAQ" }
+    "MSFT": { company: "Microsoft", market: "NASDAQ" },
+    "AMZN": { company: "Amazon", market: "NASDAQ" },
+    "GOOGL": { company: "Google", market: "NASDAQ" },
+    "META": { company: "Meta Platforms", market: "NASDAQ" },
+    "AMD.O": { company: "AMD", market: "NASDAQ" },
+    "AMD": { company: "AMD", market: "NASDAQ" }
   };
   return catalog[clean] || { company: clean.split('.')[0], market: clean.endsWith(".MI") ? "Borsa Italiana" : clean.endsWith(".L") ? "London Stock Exchange" : "NASDAQ" };
 }
