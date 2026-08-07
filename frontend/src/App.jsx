@@ -258,6 +258,112 @@ export default function App() {
     } catch (e) {
       showAnalysisError('Impossibile connettersi al server bridge locale (porta 3001). Avvia node server.js.');
     }
+  // ── Helper Promise per eseguire l'analisi live di un singolo ticker ───────
+  const analyzeSingleTickerAsync = (target, index, total) => {
+    return new Promise((resolve) => {
+      setQuery(target);
+      setLogs(prev => [...prev, {
+        agent: 'Controller & Orchestrator Agent',
+        msg: `🚀 Avvio analisi sequenziale live [${index}/${total}] per: ${target}`,
+        time: new Date().toLocaleTimeString()
+      }]);
+
+      try {
+        const eventSource = new EventSource(`http://localhost:3001/api/analyze?ticker=${encodeURIComponent(target)}`);
+
+        let connectionTimeout = setTimeout(() => {
+          eventSource.close();
+          setLogs(prev => [...prev, {
+            agent: 'System',
+            msg: `❌ Timeout connessione per ${target}`,
+            time: new Date().toLocaleTimeString()
+          }]);
+          resolve(false);
+        }, 120000);
+
+        eventSource.onopen = () => {
+          clearTimeout(connectionTimeout);
+        };
+
+        eventSource.onmessage = (event) => {
+          try {
+            const eventData = JSON.parse(event.data);
+            if (eventData.type === 'log') {
+              setLogs(prev => [...prev, {
+                agent: eventData.agent,
+                msg: eventData.msg,
+                time: new Date().toLocaleTimeString()
+              }]);
+            } else if (eventData.type === 'data') {
+              const realData = eventData.data;
+              setRealTickerData(prev => ({ ...prev, [target]: realData }));
+              setData(realData);
+              eventSource.close();
+              resolve(true);
+            } else if (eventData.type === 'error') {
+              eventSource.close();
+              setLogs(prev => [...prev, {
+                agent: 'System',
+                msg: `❌ Errore durante l'analisi di ${target}: ${eventData.msg}`,
+                time: new Date().toLocaleTimeString()
+              }]);
+              resolve(false);
+            }
+          } catch (e) {
+            console.error('Error processing event message:', e);
+          }
+        };
+
+        eventSource.onerror = () => {
+          clearTimeout(connectionTimeout);
+          eventSource.close();
+          setLogs(prev => [...prev, {
+            agent: 'System',
+            msg: `❌ Errore di rete durante l'analisi di ${target}`,
+            time: new Date().toLocaleTimeString()
+          }]);
+          resolve(false);
+        };
+
+      } catch (e) {
+        resolve(false);
+      }
+    });
+  };
+
+  // ── Avvia analisi reale per TUTTI i titoli in Watchlist ─────────────────
+  const runAllAnalyses = async () => {
+    if (watchlist.length === 0 || loading) return;
+
+    setLoading(true);
+    setLogs([]);
+    setActiveTab('logs');
+
+    setLogs(prev => [...prev, {
+      agent: 'Controller & Orchestrator Agent',
+      msg: `🚀 Avvio scansione completa per tutti i ${watchlist.length} titoli in Watchlist...`,
+      time: new Date().toLocaleTimeString()
+    }]);
+
+    for (let i = 0; i < watchlist.length; i++) {
+      const ticker = watchlist[i];
+      await analyzeSingleTickerAsync(ticker, i + 1, watchlist.length);
+      if (i < watchlist.length - 1) {
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+
+    setLogs(prev => [...prev, {
+      agent: 'Controller & Orchestrator Agent',
+      msg: `✅ Scansione completata per tutti i ${watchlist.length} titoli in Watchlist!`,
+      time: new Date().toLocaleTimeString()
+    }]);
+
+    if (watchlist[0] && realTickerData[watchlist[0]]) {
+      setQuery(watchlist[0]);
+      setData(realTickerData[watchlist[0]]);
+    }
+    setLoading(false);
   };
 
   // ── Aggiungi ticker alla watchlist ────────────────────────────────────────
@@ -427,8 +533,24 @@ export default function App() {
         <div className="watchlist-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div>
             <span className="watchlist-title">📊 Watchlist — Sentiment Overview</span>
-            <span className="watchlist-sub">{watchlist.length} titoli · Clicca 🔄 per analizzare un titolo via ChatGPT</span>
+            <span className="watchlist-sub">{watchlist.length} titoli nella tua lista monitorata</span>
           </div>
+          <button
+            className="btn-primary"
+            onClick={runAllAnalyses}
+            disabled={loading || watchlist.length === 0}
+            style={{
+              padding: '0.45rem 0.9rem',
+              fontSize: '0.82rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              fontWeight: '600'
+            }}
+            title="Esegui l'analisi live via Playwright & ChatGPT per TUTTI i titoli in Watchlist"
+          >
+            {loading ? '⏳ Scansione in corso...' : '⚡ Aggiorna News Tutti (Watchlist)'}
+          </button>
         </div>
         <div className="watchlist-table">
           <div className="wt-thead">
