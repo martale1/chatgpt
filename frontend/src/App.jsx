@@ -1239,7 +1239,7 @@ export default function App() {
                     const pct = x / rect.width;
                     setCrosshairPos(x);
                     if (chartHistoryBars && chartHistoryBars.length > 0) {
-                      const plotPct = Math.min(Math.max(0, (pct - 0.075) / 0.765), 1);
+                      const plotPct = Math.min(Math.max(0, (pct - 0.065) / 0.80), 1);
                       const idx = Math.min(Math.max(0, Math.round(plotPct * (chartHistoryBars.length - 1))), chartHistoryBars.length - 1);
                       const bar = chartHistoryBars[idx];
                       if (bar) {
@@ -1253,7 +1253,7 @@ export default function App() {
                     const x = e.clientX - rect.left;
                     const pct = x / rect.width;
                     if (chartHistoryBars && chartHistoryBars.length > 0) {
-                      const plotPct = Math.min(Math.max(0, (pct - 0.075) / 0.765), 1);
+                      const plotPct = Math.min(Math.max(0, (pct - 0.065) / 0.80), 1);
                       const idx = Math.min(Math.max(0, Math.round(plotPct * (chartHistoryBars.length - 1))), chartHistoryBars.length - 1);
                       const bar = chartHistoryBars[idx];
                       if (bar) {
@@ -1422,7 +1422,7 @@ export default function App() {
                                   />
                                 )}
                                 <img
-                                  src={chartItem.url}
+                                  src={`${chartItem.url}?v=${chartVersion}`}
                                   alt={chartItem.title}
                                   draggable={false}
                                   onDragStart={(e) => e.preventDefault()}
