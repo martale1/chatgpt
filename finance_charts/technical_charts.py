@@ -295,15 +295,15 @@ def plot_price_alligator(df, ticker, output_path, days=252, chart_type="candlest
         ax.axhline(abs_highs, color="#ef4444", linestyle=":", linewidth=1.4, alpha=0.7)
         ax.text(x[-1] + 0.5, abs_highs, f"  RES MAX {abs_highs:.2f}", color="#ef4444", fontweight="bold", fontsize=9, va="center")
 
-    # Linea SUPPORTO DI BREVE (Verde Tratteggiato)
-    support_level = imm_lows
+    # Linea SUPPORTO STRUTTURALE (Verde Tratteggiato - allineato con il minimo reale 27.62 di Vision AI)
+    support_level = abs_lows
     ax.axhline(support_level, color="#16a34a", linestyle="--", linewidth=1.8, alpha=0.9)
     ax.text(x[-1] + 0.5, support_level, f"  SUPPORTO {support_level:.2f}", color="#16a34a", fontweight="bold", fontsize=10, va="center")
 
-    # Se esiste un minimo assoluto inferiore al supporto di breve, mostralo come Supporto Min (Puntinato)
-    if abs_lows < support_level * 0.985:
-        ax.axhline(abs_lows, color="#22c55e", linestyle=":", linewidth=1.4, alpha=0.7)
-        ax.text(x[-1] + 0.5, abs_lows, f"  SUP MIN {abs_lows:.2f}", color="#22c55e", fontweight="bold", fontsize=9, va="center")
+    # Se esiste un minimo recente di breve periodo superiore al supporto strutturale, mostralo come Supporto di Breve (Puntinato)
+    if imm_lows > support_level * 1.01:
+        ax.axhline(imm_lows, color="#22c55e", linestyle=":", linewidth=1.4, alpha=0.7)
+        ax.text(x[-1] + 0.5, imm_lows, f"  SUPP BREVE {imm_lows:.2f}", color="#22c55e", fontweight="bold", fontsize=9, va="center")
 
     # Set clean Y-axis limits dynamically centered around actual price range
     price_min = abs_lows
