@@ -75,6 +75,60 @@ def adx_di(df, period=14):
     return adx_values, plus_di, minus_di
 
 
+def parabolic_sar(df, af_start=0.02, af_step=0.02, af_max=0.2):
+    high = df["High"].values
+    low = df["Low"].values
+    close = df["Close"].values
+    length = len(df)
+
+    sar = np.zeros(length)
+    if length < 2:
+        return pd.Series(sar, index=df.index)
+
+    uptrend = close[1] >= close[0]
+    af = af_start
+
+    if uptrend:
+        sar[1] = low[0]
+        ep = high[1]
+        hp = high[1]
+        lp = low[0]
+    else:
+        sar[1] = high[0]
+        ep = low[1]
+        hp = high[0]
+        lp = low[1]
+
+    for i in range(2, length):
+        prev_sar = sar[i - 1]
+        if uptrend:
+            sar[i] = prev_sar + af * (hp - prev_sar)
+            sar[i] = min(sar[i], low[i - 1], low[i - 2])
+            if low[i] < sar[i]:
+                uptrend = False
+                sar[i] = hp
+                lp = low[i]
+                af = af_start
+            else:
+                if high[i] > hp:
+                    hp = high[i]
+                    af = min(af + af_step, af_max)
+        else:
+            sar[i] = prev_sar + af * (lp - prev_sar)
+            sar[i] = max(sar[i], high[i - 1], high[i - 2])
+            if high[i] > sar[i]:
+                uptrend = True
+                sar[i] = lp
+                hp = high[i]
+                af = af_start
+            else:
+                if low[i] < lp:
+                    lp = low[i]
+                    af = min(af + af_step, af_max)
+
+    return pd.Series(sar, index=df.index)
+
+
 def add_indicators(df):
     out = df.copy()
     out["EMA9"] = ema(out["Close"], 9)
@@ -91,6 +145,7 @@ def add_indicators(df):
     out["ADX"], out["PLUS_DI"], out["MINUS_DI"] = adx_di(out)
     out["Vol_MA10"] = out["Volume"].rolling(10).mean()
     out["Vol_MA5"] = out["Volume"].rolling(5).mean()
+    out["SAR"] = parabolic_sar(out)
     return out
 
 
@@ -149,6 +204,51 @@ def plot_price_alligator(df, ticker, output_path, days=252, chart_type="candlest
     ax.plot(x, view["EMA30"], label="EMA30", color="#db2777", linewidth=1.2, alpha=0.7)
     ax.plot(x, view["EMA50"], label="EMA50", color="#f97316", linewidth=1.2, alpha=0.7)
 
+    # ── PARABOLIC SAR PLOTTING (Green below price / Red above price) ──────
+    if "SAR" in view.columns:
+        sar_vals = view["SAR"].values
+        closes = view["Close"].values
+        buy_mask = sar_vals <= closes
+        sell_mask = sar_vals > closes
+        ax.scatter(x[buy_mask], sar_vals[buy_mask], color="#16a34a", s=14, zorder=5, label="SAR (Buy)")
+        ax.scatter(x[sell_mask], sar_vals[sell_mask], color="#ef4444", s=14, zorder=5, label="SAR (Sell)")
+
+    # ── VARIATION PERCENTAGE BADGE BOX (1D, 5D, 12D, 30D, 180D) ─────────────
+    def _calc_pct(days_back):
+        if len(df) > days_back:
+            p_old = float(df["Close"].iloc[-1 - days_back])
+            p_curr = float(df["Close"].iloc[-1])
+            if p_old > 0:
+                return (p_curr - p_old) / p_old * 100
+        return None
+
+    v1d = _calc_pct(1)
+    v5d = _calc_pct(5)
+    v12d = _calc_pct(12)
+    v30d = _calc_pct(30)
+    v180d = _calc_pct(180)
+
+    var_parts = []
+    if v1d is not None: var_parts.append(f"1D: {v1d:+.2f}%")
+    if v5d is not None: var_parts.append(f"5D: {v5d:+.2f}%")
+    if v12d is not None: var_parts.append(f"12D: {v12d:+.2f}%")
+    if v30d is not None: var_parts.append(f"30D: {v30d:+.2f}%")
+    if v180d is not None: var_parts.append(f"180D: {v180d:+.2f}%")
+
+    if var_parts:
+        var_text = "   ".join(var_parts)
+        ax.text(
+            0.5, 0.94,
+            var_text,
+            transform=ax.transAxes,
+            fontsize=9.5,
+            fontweight="bold",
+            color="#0f172a",
+            ha="center",
+            va="top",
+            bbox=dict(boxstyle="round,pad=0.4", facecolor="#ffffff", edgecolor="#94a3b8", alpha=0.92)
+        )
+
     last_close = float(view["Close"].iloc[-1])
     recent_lows = float(view["Low"].min())
     recent_highs = float(view["High"].max())
@@ -170,7 +270,7 @@ def plot_price_alligator(df, ticker, output_path, days=252, chart_type="candlest
     ax.set_title(f"{ticker} - Price & Levels ({len(view)} sessioni)", fontweight="bold")
     ax.set_ylabel("Price (€ / $)")
     ax.grid(True, alpha=0.25)
-    ax.legend(loc="upper left", ncol=3)
+    ax.legend(loc="upper left", ncol=4)
     _decorate_position_axis(ax, view)
     return _save(fig, output_path)
 
