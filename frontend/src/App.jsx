@@ -221,9 +221,9 @@ export default function App() {
       case '1m': return { period: '1mo', days: 22 };
       case '3m': return { period: '3mo', days: 65 };
       case '6m': return { period: '6mo', days: 130 };
-      case '1a': return { period: '1y', days: 70 };
-      case '2a': return { period: '2y', days: 500 };
-      default: return { period: '1y', days: 70 };
+      case '1a': return { period: '1y', days: 252 };
+      case '2a': return { period: '2y', days: 504 };
+      default: return { period: '1y', days: 252 };
     }
   };
 
