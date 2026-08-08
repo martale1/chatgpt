@@ -18,6 +18,20 @@ def download_history(ticker, period="1y"):
     df = df.dropna(subset=["Open", "High", "Low", "Close"]).copy()
     if not isinstance(df.index, pd.DatetimeIndex):
         df.index = pd.to_datetime(df.index)
+
+    # Filter out extreme raw data spikes from Yahoo Finance (e.g. VOD.L 12047.5 High spike)
+    bad_high = df["High"] > (df["Close"] * 2.5)
+    if bad_high.any():
+        df.loc[bad_high, "High"] = df.loc[bad_high, ["Open", "Close"]].max(axis=1) * 1.02
+
+    bad_low = df["Low"] < (df["Close"] * 0.3)
+    if bad_low.any():
+        df.loc[bad_low, "Low"] = df.loc[bad_low, ["Open", "Close"]].min(axis=1) * 0.98
+
+    bad_open = (df["Open"] > df["Close"] * 2.5) | (df["Open"] < df["Close"] * 0.3)
+    if bad_open.any():
+        df.loc[bad_open, "Open"] = df.loc[bad_open, "Close"]
+
     return df
 
 
