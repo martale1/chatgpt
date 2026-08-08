@@ -1315,32 +1315,6 @@ export default function App() {
                                 ))}
                               </div>
 
-                              {/* HEIGHT CONTROLS */}
-                              <div style={{ display: 'flex', gap: '0.3rem', background: '#f1f5f9', padding: '0.25rem', borderRadius: '8px' }}>
-                                {[
-                                  { id: '380px', label: '📐 Compatto' },
-                                  { id: '480px', label: '📐 Standard' },
-                                  { id: '650px', label: '📐 Esteso' },
-                                ].map((h) => (
-                                  <button
-                                    key={h.id}
-                                    onClick={() => setChartHeight(h.id)}
-                                    style={{
-                                      border: 'none',
-                                      background: chartHeight === h.id ? '#2563eb' : 'transparent',
-                                      color: chartHeight === h.id ? '#ffffff' : '#475569',
-                                      padding: '0.35rem 0.55rem',
-                                      borderRadius: '6px',
-                                      fontSize: '0.75rem',
-                                      fontWeight: 700,
-                                      cursor: 'pointer'
-                                    }}
-                                  >
-                                    {h.label}
-                                  </button>
-                                ))}
-                              </div>
-
                               <button
                                 onClick={() => runChartAgentAnalysis(row.ticker)}
                                 disabled={loading}
@@ -1513,7 +1487,7 @@ export default function App() {
                                             onMouseMove={handleMouseMove}
                                             onMouseLeave={handleMouseLeave}
                                             onClick={handleChartClick}
-                                            style={{ width: '100%', display: 'block', maxHeight: chartHeight, objectFit: 'contain', userSelect: 'none', WebkitUserDrag: 'none' }}
+                                            style={{ width: '100%', height: 'auto', display: 'block', userSelect: 'none', WebkitUserDrag: 'none' }}
                                             onError={(e) => {
                                               const fallbackUrl = `http://localhost:3001/finance_charts/${row.ticker}_momentum.png`;
                                               const priceUrl = `http://localhost:3001/finance_charts/${row.ticker}_price_alligator.png`;
