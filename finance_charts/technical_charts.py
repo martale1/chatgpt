@@ -213,7 +213,7 @@ def plot_price_alligator(df, ticker, output_path, days=252, chart_type="candlest
         ax.scatter(x[buy_mask], sar_vals[buy_mask], color="#16a34a", s=14, zorder=5, label="SAR (Buy)")
         ax.scatter(x[sell_mask], sar_vals[sell_mask], color="#ef4444", s=14, zorder=5, label="SAR (Sell)")
 
-    # ── VARIATION PERCENTAGE BADGE BOX (1D, 5D, 12D, 30D, 180D) ─────────────
+    # ── VARIATION PERCENTAGE BADGE BOX (1D, 5D, 12D, 30D, 180D) WITH COLOR CODES ───────
     def _calc_pct(days_back):
         if len(df) > days_back:
             p_old = float(df["Close"].iloc[-1 - days_back])
@@ -228,26 +228,35 @@ def plot_price_alligator(df, ticker, output_path, days=252, chart_type="candlest
     v30d = _calc_pct(30)
     v180d = _calc_pct(180)
 
-    var_parts = []
-    if v1d is not None: var_parts.append(f"1D: {v1d:+.2f}%")
-    if v5d is not None: var_parts.append(f"5D: {v5d:+.2f}%")
-    if v12d is not None: var_parts.append(f"12D: {v12d:+.2f}%")
-    if v30d is not None: var_parts.append(f"30D: {v30d:+.2f}%")
-    if v180d is not None: var_parts.append(f"180D: {v180d:+.2f}%")
+    try:
+        from matplotlib.offsetbox import AnchoredOffsetbox, HBox, TextArea
 
-    if var_parts:
-        var_text = "   ".join(var_parts)
-        ax.text(
-            0.5, 0.94,
-            var_text,
-            transform=ax.transAxes,
-            fontsize=9.5,
-            fontweight="bold",
-            color="#0f172a",
-            ha="center",
-            va="top",
-            bbox=dict(boxstyle="round,pad=0.4", facecolor="#ffffff", edgecolor="#94a3b8", alpha=0.92)
-        )
+        box_children = []
+        for label, val in [("1D", v1d), ("5D", v5d), ("12D", v12d), ("30D", v30d), ("180D", v180d)]:
+            if val is not None:
+                color = "#15803d" if val >= 0 else "#dc2626"
+                txt_str = f"{label}: {val:+.2f}%   "
+                t = TextArea(txt_str, textprops=dict(color=color, fontweight="bold", fontsize=9.5))
+                box_children.append(t)
+
+        if box_children:
+            hbox = HBox(children=box_children)
+            anchored_box = AnchoredOffsetbox(
+                loc="upper center",
+                child=hbox,
+                pad=0.35,
+                borderpad=0.4,
+                frameon=True,
+                bbox_to_anchor=(0.5, 0.98),
+                bbox_transform=ax.transAxes,
+            )
+            anchored_box.patch.set_facecolor("#ffffff")
+            anchored_box.patch.set_edgecolor("#94a3b8")
+            anchored_box.patch.set_alpha(0.95)
+            anchored_box.patch.set_boxstyle("round,pad=0.4")
+            ax.add_artist(anchored_box)
+    except Exception:
+        pass
 
     last_close = float(view["Close"].iloc[-1])
     recent_lows = float(view["Low"].min())
@@ -267,10 +276,15 @@ def plot_price_alligator(df, ticker, output_path, days=252, chart_type="candlest
     ax.axhline(support_level, color="#16a34a", linestyle="--", linewidth=1.8, alpha=0.9)
     ax.text(x[-1] + 0.5, support_level, f"  SUPPORTO {support_level:.2f}", color="#16a34a", fontweight="bold", fontsize=10, va="center")
 
+    # Expand top y-axis limit slightly so candles/lines never overlap top badge or legend
+    y_min, y_max = ax.get_ylim()
+    y_range = y_max - y_min
+    ax.set_ylim(y_min, y_max + y_range * 0.12)
+
     ax.set_title(f"{ticker} - Price & Levels ({len(view)} sessioni)", fontweight="bold")
     ax.set_ylabel("Price (€ / $)")
     ax.grid(True, alpha=0.25)
-    ax.legend(loc="upper left", ncol=4)
+    ax.legend(loc="upper left", ncol=4, fontsize=8.5, framealpha=0.9)
     _decorate_position_axis(ax, view)
     return _save(fig, output_path)
 
