@@ -417,7 +417,7 @@ Regole:
 - Identifica chiaramente il PREZZO, il TRIGGER e il SUPPORTO nel grafico allegato."""
 
 
-def run_chart_report(context, stock, period="1y", days=70, chart_type="candlestick"):
+def run_chart_report(context, stock, period="1y", days=252, chart_type="candlestick"):
     safe_print(f"\n=== Generazione & Analisi Grafico AI: {stock['company']} ({stock['ticker']}) [Period: {period}, Days: {days}, Type: {chart_type}] ===")
     output_dir = Path("finance_charts")
     output_dir.mkdir(exist_ok=True)

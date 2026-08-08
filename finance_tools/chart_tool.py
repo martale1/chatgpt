@@ -15,7 +15,7 @@ def _round_floats(value):
     return value
 
 
-def generate_chart_context(ticker, days=70, period="1y"):
+def generate_chart_context(ticker, days=252, period="1y"):
     print(f"[chart-tool] {ticker} - preparo cartella output e scarico dati Yahoo Finance", flush=True)
     output_dir = PROJECT_ROOT / "output" / "stock_ai" / ticker.replace("/", "_")
     print(f"[chart-tool] {ticker} - genero grafici tecnici | days={days} period={period}", flush=True)
@@ -33,5 +33,5 @@ def generate_chart_context(ticker, days=70, period="1y"):
     return result
 
 
-def generate_chart_context_json(ticker, days=70, period="1y"):
+def generate_chart_context_json(ticker, days=252, period="1y"):
     return json.dumps(generate_chart_context(ticker, days, period), ensure_ascii=False, indent=2)

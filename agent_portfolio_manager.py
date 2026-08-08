@@ -26,7 +26,7 @@ def log_step(message):
 
 
 @function_tool
-def analyze_stock_chart(ticker: str, days: int = 70, period: str = "1y") -> str:
+def analyze_stock_chart(ticker: str, days: int = 252, period: str = "1y") -> str:
     """Generate technical charts and numeric technical context for one stock.
 
     Args:

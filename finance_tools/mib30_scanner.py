@@ -78,7 +78,7 @@ def score_snapshot(snapshot):
     return score, reasons, risks
 
 
-def scan_mib30_candidates(limit=5, days=70, period="1y", create_proposals=False, universe_limit=None, verbose=True):
+def scan_mib30_candidates(limit=5, days=252, period="1y", create_proposals=False, universe_limit=None, verbose=True):
     rows = []
     errors = []
     universe = load_mib30_tickers()
@@ -172,7 +172,7 @@ def scan_mib30_candidates(limit=5, days=70, period="1y", create_proposals=False,
     return output
 
 
-def scan_mib30_candidates_json(limit=5, days=70, period="1y", create_proposals=False, universe_limit=None):
+def scan_mib30_candidates_json(limit=5, days=252, period="1y", create_proposals=False, universe_limit=None):
     return json.dumps(
         scan_mib30_candidates(
             limit=limit,
@@ -186,7 +186,7 @@ def scan_mib30_candidates_json(limit=5, days=70, period="1y", create_proposals=F
     )
 
 
-def propose_virtual_allocation(capital, max_positions=5, cash_pct=15, days=70, period="1y", universe_limit=None):
+def propose_virtual_allocation(capital, max_positions=5, cash_pct=15, days=252, period="1y", universe_limit=None):
     scan = scan_mib30_candidates(
         limit=max_positions,
         days=days,
@@ -255,7 +255,7 @@ def propose_virtual_allocation(capital, max_positions=5, cash_pct=15, days=70, p
     }
 
 
-def propose_virtual_allocation_json(capital, max_positions=5, cash_pct=15, days=70, period="1y", universe_limit=None):
+def propose_virtual_allocation_json(capital, max_positions=5, cash_pct=15, days=252, period="1y", universe_limit=None):
     return json.dumps(
         propose_virtual_allocation(
             capital=capital,

@@ -250,7 +250,7 @@ const server = http.createServer((req, meRes) => {
   if (parsedUrl.pathname === '/api/chart-history' && req.method === 'GET') {
     const ticker = parsedUrl.query.ticker || 'VOD.L';
     const period = parsedUrl.query.period || '1y';
-    const days = parseInt(parsedUrl.query.days || '70');
+    const days = parseInt(parsedUrl.query.days || '252');
 
     const pythonCmd = `
 import json, yfinance as yf
@@ -312,7 +312,7 @@ print(json.dumps(bars))
     res.write(`data: ${JSON.stringify({ type: 'log', agent: 'Controller & Orchestrator Agent', msg: `Avvio dello scraper Playwright (${isChart ? 'Analisi Grafico AI' : 'Analisi News'}) per il ticker: ${ticker}` })}\n\n`);
 
     const period = parsedUrl.query.period || '1y';
-    const days = parsedUrl.query.days || '70';
+    const days = parsedUrl.query.days || '252';
     const chartType = parsedUrl.query.chart_type || 'candlestick';
 
     const args = [
