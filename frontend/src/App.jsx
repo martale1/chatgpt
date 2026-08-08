@@ -171,6 +171,7 @@ export default function App() {
   const [chartTimeframe, setChartTimeframe] = useState('3m');
   const [chartType, setChartType] = useState('candlestick');
   const [chartIndicatorTab, setChartIndicatorTab] = useState('prezzo');
+  const [chartHeight, setChartHeight] = useState('420px');
   const [chartHistoryBars, setChartHistoryBars] = useState([]);
   const [chartMetrics, setChartMetrics] = useState({});
   const [hoveredBarIndex, setHoveredBarIndex] = useState(null);
@@ -1263,7 +1264,7 @@ export default function App() {
                               })}
                             </div>
 
-                            {/* TIMEFRAME & INDICATORS CONTROLS */}
+                            {/* TIMEFRAME, INDICATORS & HEIGHT CONTROLS */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.8rem', marginBottom: '0.9rem', flexWrap: 'wrap' }}>
                               <div style={{ display: 'flex', gap: '0.4rem', background: '#f1f5f9', padding: '0.25rem', borderRadius: '8px' }}>
                                 {['5g', '1m', '3m', '6m', '1a', '2a'].map((tf) => (
@@ -1314,6 +1315,32 @@ export default function App() {
                                 ))}
                               </div>
 
+                              {/* HEIGHT CONTROLS */}
+                              <div style={{ display: 'flex', gap: '0.3rem', background: '#f1f5f9', padding: '0.25rem', borderRadius: '8px' }}>
+                                {[
+                                  { id: '380px', label: '📐 Compatto' },
+                                  { id: '480px', label: '📐 Standard' },
+                                  { id: '650px', label: '📐 Esteso' },
+                                ].map((h) => (
+                                  <button
+                                    key={h.id}
+                                    onClick={() => setChartHeight(h.id)}
+                                    style={{
+                                      border: 'none',
+                                      background: chartHeight === h.id ? '#2563eb' : 'transparent',
+                                      color: chartHeight === h.id ? '#ffffff' : '#475569',
+                                      padding: '0.35rem 0.55rem',
+                                      borderRadius: '6px',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 700,
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    {h.label}
+                                  </button>
+                                ))}
+                              </div>
+
                               <button
                                 onClick={() => runChartAgentAnalysis(row.ticker)}
                                 disabled={loading}
@@ -1333,7 +1360,7 @@ export default function App() {
                               </button>
                             </div>
 
-                            {/* IDENTIFIED LEVELS STATUS BAR */}
+                            {/* IDENTIFIED LEVELS STATUS BAR & TOP REAL-TIME INSPECTION CARDS */}
                             {(() => {
                               const chartData = realTickerData[query + '_CHART'] || realTickerData[row.ticker + '_CHART'];
                               const cta = chartData?.chart_technical_analysis;
@@ -1362,8 +1389,11 @@ export default function App() {
                               }
 
                               const currentClose = cta?.identified_levels?.current_price || row.currentPrice || '—';
-                              const triggerPrice = cta ? (cta?.identified_levels?.trigger_price || (Array.isArray(cta?.chart_resistances) && cta.chart_resistances[0]) || '—') : 'In attesa di analisi Grafico AI';
-                              const supportPrice = cta ? (cta?.identified_levels?.support_price || (Array.isArray(cta?.chart_supports) && cta.chart_supports[0]) || '—') : 'In attesa di analisi Grafico AI';
+                              const rawTrigger = cta?.identified_levels?.trigger_price;
+                              const triggerPrice = (rawTrigger && typeof rawTrigger === 'number' && rawTrigger < 5000)
+                                ? rawTrigger
+                                : ((Array.isArray(cta?.chart_resistances) && cta.chart_resistances[0] && cta.chart_resistances[0] < 5000) ? cta.chart_resistances[0] : (chartHistoryBars.length > 0 ? chartHistoryBars[chartHistoryBars.length - 1].close : '—'));
+                              const supportPrice = cta ? (cta?.identified_levels?.support_price || (Array.isArray(cta?.chart_supports) && cta.chart_supports[0]) || '—') : '—';
 
                               const activeBar = hoveredBar ? hoveredBar : (clickedBar ? clickedBar : (chartHistoryBars.length > 0 ? chartHistoryBars[chartHistoryBars.length - 1] : null));
                               const displayDate = activeBar ? activeBar.date : (data?.search_metadata?.timestamp_utc ? new Date(data.search_metadata.timestamp_utc).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
@@ -1403,17 +1433,60 @@ export default function App() {
 
                               return (
                                 <>
-                                  <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.7rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
-                                    <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '0.25rem 0.65rem', borderRadius: '6px' }}>
-                                      🔵 PREZZO {currentClose}
+                                  {/* ── TOP REAL-TIME INSPECTION CARDS & BADGES ── */}
+                                  <div style={{ display: 'flex', gap: '0.8rem', marginBottom: '0.9rem', alignItems: 'stretch', flexWrap: 'wrap' }}>
+                                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.5rem 0.9rem', flex: '1', minWidth: '120px' }}>
+                                      <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>📅 Data Selezionata</div>
+                                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>{displayDate}</div>
                                     </div>
-                                    <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', padding: '0.25rem 0.65rem', borderRadius: '6px' }}>
-                                      🔴 TRIGGER {triggerPrice}
+                                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.5rem 0.9rem', flex: '1', minWidth: '120px' }}>
+                                      <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>📈 Chiusura</div>
+                                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>{displayClose}</div>
                                     </div>
-                                    <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '0.25rem 0.65rem', borderRadius: '6px' }}>
-                                      🟢 SUPPORTO {supportPrice}
+                                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.5rem 0.9rem', flex: '1', minWidth: '140px' }}>
+                                      <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>📊 Variazione 1D</div>
+                                      <div style={{ marginTop: '2px' }}>
+                                        <span style={{ display: 'inline-block', padding: '0.12rem 0.5rem', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 800, background: isPos ? '#dcfce7' : '#fee2e2', color: isPos ? '#15803d' : '#991b1b' }}>
+                                          {isPos ? '+' : ''}{displayChange}%
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    {/* STATUS BADGES */}
+                                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                      <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '0.35rem 0.65rem', borderRadius: '8px' }}>
+                                        🔵 PREZZO {currentClose}
+                                      </div>
+                                      <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', padding: '0.35rem 0.65rem', borderRadius: '8px' }}>
+                                        🔴 TRIGGER {triggerPrice}
+                                      </div>
+                                      <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '0.35rem 0.65rem', borderRadius: '8px' }}>
+                                        🟢 SUPPORTO {supportPrice}
+                                      </div>
                                     </div>
                                   </div>
+
+                                  {/* CLICKED CANDLE INSPECTION NOTE (TOP) */}
+                                  {clickedBar ? (
+                                    <div style={{ marginBottom: '0.9rem', padding: '0.6rem 0.9rem', background: '#eff6ff', borderRadius: '10px', border: '1px solid #93c5fd', color: '#1e3a8a', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
+                                      <div style={{ fontSize: '0.82rem' }}>
+                                        <strong style={{ color: '#1d4ed8', fontSize: '0.88rem' }}>📌 Nota Ispezione Barra del {clickedBar.date}:</strong> &nbsp;
+                                        <span>Chiusura: <strong>{clickedBar.close} €</strong> &nbsp;|&nbsp; </span>
+                                        <span>Apertura: <strong>{clickedBar.open} €</strong> &nbsp;|&nbsp; </span>
+                                        <span>Massimo: <strong>{clickedBar.high} €</strong> &nbsp;|&nbsp; </span>
+                                        <span>Minimo: <strong>{clickedBar.low} €</strong> &nbsp;|&nbsp; </span>
+                                        <span>Variazione 1D: <strong style={{ color: clickedBar.change_pct >= 0 ? '#15803d' : '#b91c1c' }}>{clickedBar.change_pct >= 0 ? '+' : ''}{clickedBar.change_pct}%</strong> &nbsp;|&nbsp; </span>
+                                        <span>Volumi: <strong>{clickedBar.volume?.toLocaleString('it-IT') || '—'}</strong></span>
+                                      </div>
+                                      <button onClick={() => setClickedBar(null)} style={{ background: '#ffffff', border: '1px solid #93c5fd', color: '#1e40af', padding: '0.25rem 0.6rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}>
+                                        ✕ Sblocca
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div style={{ marginBottom: '0.7rem', fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic' }}>
+                                      💡 <em>Fai passaggio o click su qualsiasi candela del grafico: i dati di quel giorno appariranno in tempo reale nel box qui sopra!</em>
+                                    </div>
+                                  )}
 
                                   {/* MAIN CHART IMAGES DISPLAY */}
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
@@ -1440,7 +1513,7 @@ export default function App() {
                                             onMouseMove={handleMouseMove}
                                             onMouseLeave={handleMouseLeave}
                                             onClick={handleChartClick}
-                                            style={{ width: '100%', display: 'block', minHeight: '260px', objectFit: 'contain', userSelect: 'none', WebkitUserDrag: 'none' }}
+                                            style={{ width: '100%', display: 'block', maxHeight: chartHeight, objectFit: 'contain', userSelect: 'none', WebkitUserDrag: 'none' }}
                                             onError={(e) => {
                                               const fallbackUrl = `http://localhost:3001/finance_charts/${row.ticker}_momentum.png`;
                                               const priceUrl = `http://localhost:3001/finance_charts/${row.ticker}_price_alligator.png`;
@@ -1455,48 +1528,6 @@ export default function App() {
                                       </div>
                                     ))}
                                   </div>
-
-                                  {/* BOTTOM SUMMARY INFO CARDS */}
-                                  <div style={{ display: 'flex', gap: '1rem', marginTop: '1.2rem', flexWrap: 'wrap' }}>
-                                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.6rem 1rem', flex: '1', minWidth: '130px' }}>
-                                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Data</div>
-                                      <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>{displayDate}</div>
-                                    </div>
-                                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.6rem 1rem', flex: '1', minWidth: '130px' }}>
-                                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Chiusura</div>
-                                      <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>{displayClose}</div>
-                                    </div>
-                                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.6rem 1rem', flex: '1', minWidth: '160px' }}>
-                                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Variazione giorno</div>
-                                      <div style={{ marginTop: '3px' }}>
-                                        <span style={{ display: 'inline-block', padding: '0.15rem 0.5rem', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 800, background: isPos ? '#dcfce7' : '#fee2e2', color: isPos ? '#15803d' : '#991b1b' }}>
-                                          {isPos ? '+' : ''}{displayChange}%
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* FOOTER INSPECTION NOTE */}
-                                  {clickedBar ? (
-                                    <div style={{ marginTop: '0.8rem', padding: '0.75rem 1rem', background: '#eff6ff', borderRadius: '10px', border: '1px solid #93c5fd', color: '#1e3a8a', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
-                                      <div style={{ fontSize: '0.84rem' }}>
-                                        <strong style={{ color: '#1d4ed8', fontSize: '0.9rem' }}>📌 Nota Ispezione Barra del {clickedBar.date}:</strong> &nbsp;
-                                        <span>Chiusura: <strong>{clickedBar.close} €</strong> &nbsp;|&nbsp; </span>
-                                        <span>Apertura: <strong>{clickedBar.open} €</strong> &nbsp;|&nbsp; </span>
-                                        <span>Massimo: <strong>{clickedBar.high} €</strong> &nbsp;|&nbsp; </span>
-                                        <span>Minimo: <strong>{clickedBar.low} €</strong> &nbsp;|&nbsp; </span>
-                                        <span>Variazione 1D: <strong style={{ color: clickedBar.change_pct >= 0 ? '#15803d' : '#b91c1c' }}>{clickedBar.change_pct >= 0 ? '+' : ''}{clickedBar.change_pct}%</strong> &nbsp;|&nbsp; </span>
-                                        <span>Volumi: <strong>{clickedBar.volume?.toLocaleString('it-IT') || '—'}</strong></span>
-                                      </div>
-                                      <button onClick={() => setClickedBar(null)} style={{ background: '#ffffff', border: '1px solid #93c5fd', color: '#1e40af', padding: '0.25rem 0.6rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}>
-                                        ✕ Sblocca
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <div style={{ marginTop: '0.6rem', fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic' }}>
-                                      💡 <em>Fai click su qualsiasi candela del grafico per fissare i dati di quel giorno nella nota a piè di pagina.</em>
-                                    </div>
-                                  )}
 
                                   {/* CHATGPT VISION DETAILS CARD */}
                                   {cta && (
