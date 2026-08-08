@@ -168,7 +168,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [logs, setLogs] = useState([]);
   const [sortOrder, setSortOrder] = useState('desc'); // default: score più alto prima ('desc')
-  const [chartTimeframe, setChartTimeframe] = useState('1a');
+  const [chartTimeframe, setChartTimeframe] = useState('3m');
   const [chartType, setChartType] = useState('candlestick');
   const [chartIndicatorTab, setChartIndicatorTab] = useState('prezzo');
   const [chartHistoryBars, setChartHistoryBars] = useState([]);
