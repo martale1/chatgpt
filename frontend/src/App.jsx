@@ -172,6 +172,7 @@ export default function App() {
   const [chartType, setChartType] = useState('candlestick');
   const [chartIndicatorTab, setChartIndicatorTab] = useState('prezzo');
   const [chartHistoryBars, setChartHistoryBars] = useState([]);
+  const [chartMetrics, setChartMetrics] = useState({});
   const [hoveredBarIndex, setHoveredBarIndex] = useState(null);
   const [hoveredBar, setHoveredBar] = useState(null);
   const [crosshairPos, setCrosshairPos] = useState(null);
@@ -234,11 +235,14 @@ export default function App() {
       const cfg = getTimeframeConfig(chartTimeframe);
       fetch(`http://localhost:3001/api/chart-history?ticker=${activeTicker}&period=${cfg.period}&days=${cfg.days}&chart_type=${chartType}`)
         .then(res => res.json())
-        .then(bars => {
-          if (Array.isArray(bars)) {
-            setChartHistoryBars(bars);
-            setChartVersion(Date.now());
+        .then(resData => {
+          if (Array.isArray(resData)) {
+            setChartHistoryBars(resData);
+          } else if (resData && Array.isArray(resData.bars)) {
+            setChartHistoryBars(resData.bars);
+            if (resData.metrics) setChartMetrics(resData.metrics);
           }
+          setChartVersion(Date.now());
         })
         .catch(() => {});
     }
@@ -1195,6 +1199,70 @@ export default function App() {
                           {/* 2. FULL-WIDTH INTERACTIVE CHART & VISION AI SECTION */}
                           <div className="chart-fullwidth-container" style={{ width: '100%', background: '#ffffff', borderRadius: '12px', padding: '1rem', color: '#0f172a' }}>
                             
+                            {/* VARIATION METRICS PILLS BAR (Close, 1D, 5D, 10D, 30D, 180D) */}
+                            <div style={{
+                              display: 'flex',
+                              gap: '0.6rem',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              marginBottom: '1rem',
+                              padding: '0.6rem 0.8rem',
+                              background: '#0b1329',
+                              borderRadius: '12px',
+                              border: '1px solid #1e293b'
+                            }}>
+                              <div style={{
+                                background: '#0f172a',
+                                border: '1px solid #334155',
+                                padding: '0.35rem 0.85rem',
+                                borderRadius: '20px',
+                                fontSize: '0.82rem',
+                                fontWeight: 800,
+                                color: '#f8fafc',
+                                display: 'flex',
+                                gap: '0.4rem',
+                                alignItems: 'center',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.3)'
+                              }}>
+                                <span>Close:</span>
+                                <span style={{ color: '#38bdf8' }}>
+                                  {chartMetrics.close !== undefined ? chartMetrics.close : (row.currentPrice || '—')}
+                                </span>
+                              </div>
+
+                              {[
+                                { label: '1D', val: chartMetrics.var_1d },
+                                { label: '5D', val: chartMetrics.var_5d },
+                                { label: '10D', val: chartMetrics.var_10d },
+                                { label: '30D', val: chartMetrics.var_30d },
+                                { label: '180D', val: chartMetrics.var_180d },
+                              ].map((item) => {
+                                const isPos = item.val >= 0;
+                                return (
+                                  <div
+                                    key={item.label}
+                                    style={{
+                                      background: '#0f172a',
+                                      border: '1px solid #334155',
+                                      padding: '0.35rem 0.85rem',
+                                      borderRadius: '20px',
+                                      fontSize: '0.82rem',
+                                      fontWeight: 800,
+                                      display: 'flex',
+                                      gap: '0.4rem',
+                                      alignItems: 'center',
+                                      boxShadow: '0 2px 6px rgba(0,0,0,0.3)'
+                                    }}
+                                  >
+                                    <span style={{ color: '#f8fafc' }}>{item.label}:</span>
+                                    <span style={{ color: item.val !== undefined && item.val !== null ? (isPos ? '#22c55e' : '#ef4444') : '#94a3b8' }}>
+                                      {item.val !== undefined && item.val !== null ? `${isPos ? '+' : ''}${item.val}%` : '—'}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
                             {/* TIMEFRAME & INDICATORS CONTROLS */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.8rem', marginBottom: '0.9rem', flexWrap: 'wrap' }}>
                               <div style={{ display: 'flex', gap: '0.4rem', background: '#f1f5f9', padding: '0.25rem', borderRadius: '8px' }}>

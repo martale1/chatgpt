@@ -260,7 +260,26 @@ try:
 except Exception:
     pass
 
-df = yf.Ticker('${ticker}').history(period='${period}').tail(${days})
+df_full = yf.Ticker('${ticker}').history(period='1y')
+metrics = {}
+if len(df_full) > 0:
+    latest_c = float(df_full['Close'].iloc[-1])
+    c_1d = float(df_full['Close'].iloc[-2]) if len(df_full) >= 2 else latest_c
+    c_5d = float(df_full['Close'].iloc[-6]) if len(df_full) >= 6 else latest_c
+    c_10d = float(df_full['Close'].iloc[-11]) if len(df_full) >= 11 else latest_c
+    c_30d = float(df_full['Close'].iloc[-22]) if len(df_full) >= 22 else latest_c
+    c_180d = float(df_full['Close'].iloc[-126]) if len(df_full) >= 126 else float(df_full['Close'].iloc[0])
+
+    metrics = {
+        'close': round(latest_c, 2),
+        'var_1d': round(((latest_c - c_1d) / c_1d) * 100, 2),
+        'var_5d': round(((latest_c - c_5d) / c_5d) * 100, 2),
+        'var_10d': round(((latest_c - c_10d) / c_10d) * 100, 2),
+        'var_30d': round(((latest_c - c_30d) / c_30d) * 100, 2),
+        'var_180d': round(((latest_c - c_180d) / c_180d) * 100, 2)
+    }
+
+df = df_full.tail(${days})
 bars = []
 for date, row in df.iterrows():
     bars.append({
@@ -278,7 +297,8 @@ for i in range(len(bars)):
         bars[i]['change_pct'] = round(((curr - prev) / prev) * 100, 2)
     else:
         bars[i]['change_pct'] = 0.0
-print(json.dumps(bars))
+
+print(json.dumps({'bars': bars, 'metrics': metrics}))
     `;
 
     const pyProc = spawn(PYTHON_PATH, ['-c', pythonCmd], { shell: false });
@@ -290,7 +310,7 @@ print(json.dumps(bars))
         const data = JSON.parse(output.trim());
         meRes.end(JSON.stringify(data));
       } catch (e) {
-        meRes.end(JSON.stringify([]));
+        meRes.end(JSON.stringify({ bars: [], metrics: {} }));
       }
     });
     return;
