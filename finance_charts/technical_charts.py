@@ -95,7 +95,7 @@ def parabolic_sar(df, af_start=0.02, af_step=0.02, af_max=0.2):
     close = df["Close"].values
     length = len(df)
 
-    sar = np.zeros(length)
+    sar = np.full(length, np.nan)
     if length < 2:
         return pd.Series(sar, index=df.index)
 
@@ -290,10 +290,11 @@ def plot_price_alligator(df, ticker, output_path, days=252, chart_type="candlest
     ax.axhline(support_level, color="#16a34a", linestyle="--", linewidth=1.8, alpha=0.9)
     ax.text(x[-1] + 0.5, support_level, f"  SUPPORTO {support_level:.2f}", color="#16a34a", fontweight="bold", fontsize=10, va="center")
 
-    # Expand top y-axis limit slightly so candles/lines never overlap top badge or legend
-    y_min, y_max = ax.get_ylim()
-    y_range = y_max - y_min
-    ax.set_ylim(y_min, y_max + y_range * 0.12)
+    # Set clean Y-axis limits dynamically centered around actual price range (with top padding for legend & badges)
+    price_min = recent_lows
+    price_max = recent_highs
+    y_range = max(price_max - price_min, 0.5)
+    ax.set_ylim(price_min - y_range * 0.06, price_max + y_range * 0.18)
 
     ax.set_title(f"{ticker} - Price & Levels ({len(view)} sessioni)", fontweight="bold")
     ax.set_ylabel("Price (€ / $)")
