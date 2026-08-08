@@ -1230,7 +1230,7 @@ export default function App() {
 
                   const displayDate = activeBar ? activeBar.date : dateStr;
                   const displayClose = activeBar ? `${activeBar.close} €` : (typeof currentClose === 'number' ? `${currentClose} €` : currentClose);
-                  const displayChange = activeBar ? activeBar.change_pct : -1.73;
+                  const displayChange = activeBar ? (typeof activeBar.change_pct === 'number' ? activeBar.change_pct : (parseFloat(activeBar.change_pct) || 0.0)) : 0.0;
                   const isPos = displayChange >= 0;
 
                   const handleMouseMove = (e) => {
@@ -1241,7 +1241,10 @@ export default function App() {
                     if (chartHistoryBars && chartHistoryBars.length > 0) {
                       const plotPct = Math.min(Math.max(0, (pct - 0.075) / 0.765), 1);
                       const idx = Math.min(Math.max(0, Math.round(plotPct * (chartHistoryBars.length - 1))), chartHistoryBars.length - 1);
-                      setHoveredBar(chartHistoryBars[idx]);
+                      const bar = chartHistoryBars[idx];
+                      if (bar) {
+                        setHoveredBar(bar);
+                      }
                     }
                   };
 
@@ -1252,7 +1255,10 @@ export default function App() {
                     if (chartHistoryBars && chartHistoryBars.length > 0) {
                       const plotPct = Math.min(Math.max(0, (pct - 0.075) / 0.765), 1);
                       const idx = Math.min(Math.max(0, Math.round(plotPct * (chartHistoryBars.length - 1))), chartHistoryBars.length - 1);
-                      setClickedBar(chartHistoryBars[idx]);
+                      const bar = chartHistoryBars[idx];
+                      if (bar) {
+                        setClickedBar(bar);
+                      }
                     }
                   };
 
@@ -1398,7 +1404,8 @@ export default function App() {
                                 onMouseMove={handleMouseMove}
                                 onMouseLeave={handleMouseLeave}
                                 onClick={handleChartClick}
-                                style={{ position: 'relative', width: '100%', cursor: 'crosshair' }}
+                                onDragStart={(e) => e.preventDefault()}
+                                style={{ position: 'relative', width: '100%', cursor: 'crosshair', userSelect: 'none' }}
                               >
                                 {crosshairPos !== null && (
                                   <div
@@ -1417,7 +1424,12 @@ export default function App() {
                                 <img
                                   src={chartItem.url}
                                   alt={chartItem.title}
-                                  style={{ width: '100%', display: 'block', minHeight: '260px', objectFit: 'contain' }}
+                                  draggable={false}
+                                  onDragStart={(e) => e.preventDefault()}
+                                  onMouseMove={handleMouseMove}
+                                  onMouseLeave={handleMouseLeave}
+                                  onClick={handleChartClick}
+                                  style={{ width: '100%', display: 'block', minHeight: '260px', objectFit: 'contain', userSelect: 'none', WebkitUserDrag: 'none' }}
                                   onError={(e) => {
                                     const fallbackUrl = `http://localhost:3001/finance_charts/${ticker}_momentum.png`;
                                     const priceUrl = `http://localhost:3001/finance_charts/${ticker}_price_alligator.png`;
