@@ -917,99 +917,395 @@ export default function App() {
           {sortedWatchlistRows.map((row) => {
             const isActive = data?.search_metadata?.ticker === row.ticker;
             return (
-              <div
-                key={row.ticker}
-                className={`wt-row${isActive ? ' wt-row-active' : ''}`}
-                style={{ borderLeft: `3px solid ${row.col.border}`, background: isActive ? 'rgba(56,189,248,0.06)' : row.col.bg, cursor: 'pointer' }}
-                onClick={() => handleSearch(row.ticker, true)}
-              >
-                <span className="wt-ticker" style={{ color: row.col.text }}>
-                  {row.ticker}
-                  <span className="wt-company">{row.company}</span>
-                  {row.timestamp && (
-                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px', display: 'block', fontWeight: 'normal' }}>
-                      📅 {row.timestamp}
-                    </span>
-                  )}
-                </span>
-                <span className="wt-market">{row.market}</span>
-                <span style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                  {row.currentPrice ? (
-                    <span style={{ fontSize: '0.85rem', color: '#38bdf8', fontWeight: 'bold' }}>
-                      📈 {row.currentPrice}
-                    </span>
-                  ) : (
-                    <span style={{ fontSize: '0.78rem', color: '#64748b' }}>—</span>
-                  )}
-                  {row.bestUpsideItem && row.bestUpsideItem.upside_percent !== undefined && row.bestUpsideItem.upside_percent > 0 && (
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        padding: '0.12rem 0.4rem',
-                        borderRadius: '8px',
-                        fontSize: '0.7rem',
-                        fontWeight: 'bold',
-                        background: 'rgba(34,197,94,0.2)',
-                        color: '#4ade80',
-                        border: '1px solid #22c55e',
-                        width: 'fit-content'
-                      }}
-                      title={`Target ${row.bestUpsideItem.broker}: ${row.bestUpsideItem.target_price}`}
-                    >
-                      🚀 +{row.bestUpsideItem.upside_percent}% ({row.bestUpsideItem.target_price})
-                    </span>
-                  )}
-                </span>
-                <span>
-                  <span className="wt-badge" style={{ color: row.col.text, borderColor: row.col.border }}>
-                    {row.sentiment}
+              <React.Fragment key={row.ticker}>
+                <div
+                  className={`wt-row${isActive ? ' wt-row-active' : ''}`}
+                  style={{ borderLeft: `3px solid ${row.col.border}`, background: isActive ? 'rgba(56,189,248,0.06)' : row.col.bg, cursor: 'pointer' }}
+                  onClick={() => {
+                    if (isActive) {
+                      // Toggle collapse
+                      setData(null);
+                    } else {
+                      handleSearch(row.ticker, true);
+                    }
+                  }}
+                >
+                  <span className="wt-ticker" style={{ color: row.col.text }}>
+                    {row.ticker}
+                    <span className="wt-company">{row.company}</span>
+                    {row.timestamp && (
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px', display: 'block', fontWeight: 'normal' }}>
+                        📅 {row.timestamp}
+                      </span>
+                    )}
                   </span>
-                </span>
-                <span className="wt-score-cell">
-                  {row.score !== null ? (
-                    <>
-                      <div className="score-bar-track" style={{ width: '80px' }}>
-                        <div className="score-bar-fill" style={{ width: `${Math.round(row.score * 100)}%`, background: row.col.border }} />
+                  <span className="wt-market">{row.market}</span>
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                    {row.currentPrice ? (
+                      <span style={{ fontSize: '0.85rem', color: '#38bdf8', fontWeight: 'bold' }}>
+                        📈 {row.currentPrice}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>—</span>
+                    )}
+                    {row.bestUpsideItem && row.bestUpsideItem.upside_percent !== undefined && row.bestUpsideItem.upside_percent > 0 && (
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          padding: '0.12rem 0.4rem',
+                          borderRadius: '8px',
+                          fontSize: '0.7rem',
+                          fontWeight: 'bold',
+                          background: 'rgba(34,197,94,0.2)',
+                          color: '#4ade80',
+                          border: '1px solid #22c55e',
+                          width: 'fit-content'
+                        }}
+                        title={`Target ${row.bestUpsideItem.broker}: ${row.bestUpsideItem.target_price}`}
+                      >
+                        🚀 +{row.bestUpsideItem.upside_percent}% ({row.bestUpsideItem.target_price})
+                      </span>
+                    )}
+                  </span>
+                  <span>
+                    <span className="wt-badge" style={{ color: row.col.text, borderColor: row.col.border }}>
+                      {row.sentiment}
+                    </span>
+                  </span>
+                  <span className="wt-score-cell">
+                    {row.score !== null ? (
+                      <>
+                        <div className="score-bar-track" style={{ width: '80px' }}>
+                          <div className="score-bar-fill" style={{ width: `${Math.round(row.score * 100)}%`, background: row.col.border }} />
+                        </div>
+                        <span style={{ color: row.col.text, fontSize: '0.8rem', fontWeight: 700 }}>{Math.round(row.score * 100)}%</span>
+                      </>
+                    ) : (
+                      <span style={{ color: '#475569', fontSize: '0.8rem' }}>—</span>
+                    )}
+                  </span>
+                  <span className="wt-impact">{row.impact}</span>
+                  <span style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                    <button
+                      className={row.analyzed ? 'btn-secondary' : 'btn-primary'}
+                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                      disabled={loading}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        runAgentAnalysis(row.ticker);
+                      }}
+                    >
+                      {row.analyzed ? '🔄 Aggiorna' : '⚡ Analizza Live'}
+                    </button>
+                    <button
+                      style={{
+                        padding: '0.3rem 0.5rem',
+                        fontSize: '0.75rem',
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        color: '#ef4444',
+                        borderRadius: '6px',
+                        cursor: 'pointer'
+                      }}
+                      title={`Rimuovi ${row.ticker} dalla Watchlist`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFromWatchlist(row.ticker);
+                      }}
+                    >
+                      🗑️
+                    </button>
+                  </span>
+                </div>
+
+                {/* ── EXPANDED INLINE CHART & VISION AI SECTION DIRECTLY UNDER THE CLICKED ITEM ── */}
+                {isActive && (
+                  <div style={{ margin: '0.4rem 0 1.2rem 0', padding: '1rem', background: '#ffffff', border: `2px solid ${row.col.border}`, borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', paddingBottom: '0.5rem', borderBottom: '1px solid #e2e8f0' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        📊 Analisi Grafica &amp; Vision AI per <strong>{row.company} ({row.ticker})</strong>
+                      </span>
+                      <button
+                        onClick={() => setData(null)}
+                        style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', padding: '0.2rem 0.6rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}
+                      >
+                        ▲ Chiudi Grafico
+                      </button>
+                    </div>
+
+                    {/* TIMEFRAME & INDICATORS CONTROLS */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.8rem', marginBottom: '0.9rem', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem', background: '#f1f5f9', padding: '0.25rem', borderRadius: '8px' }}>
+                        {['5g', '1m', '3m', '6m', '1a', '2a'].map((tf) => (
+                          <button
+                            key={tf}
+                            onClick={() => setChartTimeframe(tf)}
+                            style={{
+                              border: 'none',
+                              background: chartTimeframe === tf ? '#0f172a' : 'transparent',
+                              color: chartTimeframe === tf ? '#ffffff' : '#334155',
+                              padding: '0.35rem 0.65rem',
+                              borderRadius: '6px',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {tf}
+                          </button>
+                        ))}
                       </div>
-                      <span style={{ color: row.col.text, fontSize: '0.8rem', fontWeight: 700 }}>{Math.round(row.score * 100)}%</span>
-                    </>
-                  ) : (
-                    <span style={{ color: '#475569', fontSize: '0.8rem' }}>—</span>
-                  )}
-                </span>
-                <span className="wt-impact">{row.impact}</span>
-                <span style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                  <button
-                    className={row.analyzed ? 'btn-secondary' : 'btn-primary'}
-                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
-                    disabled={loading}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      runAgentAnalysis(row.ticker);
-                    }}
-                  >
-                    {row.analyzed ? '🔄 Aggiorna' : '⚡ Analizza Live'}
-                  </button>
-                  <button
-                    style={{
-                      padding: '0.3rem 0.5rem',
-                      fontSize: '0.75rem',
-                      background: 'rgba(239, 68, 68, 0.15)',
-                      border: '1px solid rgba(239, 68, 68, 0.4)',
-                      color: '#ef4444',
-                      borderRadius: '6px',
-                      cursor: 'pointer'
-                    }}
-                    title={`Rimuovi ${row.ticker} dalla Watchlist`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeFromWatchlist(row.ticker);
-                    }}
-                  >
-                    🗑️
-                  </button>
-                </span>
-              </div>
+
+                      <div style={{ display: 'flex', gap: '0.4rem', background: '#f1f5f9', padding: '0.25rem', borderRadius: '8px' }}>
+                        {[
+                          { id: 'tutti', label: 'Tutti' },
+                          { id: 'prezzo', label: 'Prezzo' },
+                          { id: 'volumi', label: 'Volumi' },
+                          { id: 'rsi', label: 'RSI/Stoch/W%R' },
+                          { id: 'macd', label: 'MACD' },
+                          { id: 'adx', label: 'ADX' },
+                        ].map((tab) => (
+                          <button
+                            key={tab.id}
+                            onClick={() => setChartIndicatorTab(tab.id)}
+                            style={{
+                              border: 'none',
+                              background: chartIndicatorTab === tab.id ? '#0f172a' : 'transparent',
+                              color: chartIndicatorTab === tab.id ? '#ffffff' : '#334155',
+                              padding: '0.35rem 0.65rem',
+                              borderRadius: '6px',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {tab.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={() => runChartAgentAnalysis(row.ticker)}
+                        disabled={loading}
+                        style={{
+                          background: '#2563eb',
+                          border: 'none',
+                          color: '#ffffff',
+                          padding: '0.4rem 0.85rem',
+                          borderRadius: '8px',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 6px rgba(37,99,235,0.3)'
+                        }}
+                      >
+                        {loading ? '⏳ Generazione...' : '🔄 Rigenera Grafico AI'}
+                      </button>
+                    </div>
+
+                    {/* IDENTIFIED LEVELS STATUS BAR */}
+                    {(() => {
+                      const chartData = realTickerData[query + '_CHART'] || realTickerData[row.ticker + '_CHART'];
+                      const cta = chartData?.chart_technical_analysis;
+                      const baseUrl = `http://localhost:3001/finance_charts/${row.ticker}_`;
+                      const ver = `?v=${chartVersion}`;
+
+                      let chartList = [];
+                      if (chartIndicatorTab === 'tutti') {
+                        chartList = [
+                          { id: 'price', title: '📈 1. Prezzo & Livelli (Candele / Alligator / Supporti & Trigger)', url: `${baseUrl}price_alligator.png${ver}` },
+                          { id: 'volume', title: '📊 2. Analisi Volumi & Medie Mobili (Vol MA5 & MA10)', url: `${baseUrl}volume.png${ver}` },
+                          { id: 'rsi', title: '📉 3. Oscillatori Momentum (RSI, Stochastic & Williams %R)', url: `${baseUrl}oscillators.png${ver}` },
+                          { id: 'macd', title: '📊 4. Trend Follower MACD (MACD, Signal & Istogramma)', url: `${baseUrl}macd.png${ver}` },
+                          { id: 'adx', title: '📈 5. Indicatori ADX & Direzionali Trend (ADX, DI+, DI-)', url: `${baseUrl}adx.png${ver}` },
+                        ];
+                      } else if (chartIndicatorTab === 'prezzo') {
+                        chartList = [{ id: 'price', title: '📈 Prezzo & Livelli (Candele / Alligator / Supporti & Trigger)', url: `${baseUrl}price_alligator.png${ver}` }];
+                      } else if (chartIndicatorTab === 'volumi') {
+                        chartList = [{ id: 'volume', title: '📊 Analisi Volumi & Medie Mobili (Vol MA5 & MA10)', url: `${baseUrl}volume.png${ver}` }];
+                      } else if (chartIndicatorTab === 'rsi') {
+                        chartList = [{ id: 'rsi', title: '📉 Oscillatori Momentum (RSI, Stochastic & Williams %R)', url: `${baseUrl}oscillators.png${ver}` }];
+                      } else if (chartIndicatorTab === 'macd') {
+                        chartList = [{ id: 'macd', title: '📊 Trend Follower MACD (MACD, Signal & Istogramma)', url: `${baseUrl}macd.png${ver}` }];
+                      } else if (chartIndicatorTab === 'adx') {
+                        chartList = [{ id: 'adx', title: '📈 Indicatori ADX & Direzionali Trend (ADX, DI+, DI-)', url: `${baseUrl}adx.png${ver}` }];
+                      }
+
+                      const currentClose = cta?.identified_levels?.current_price || row.currentPrice || '—';
+                      const triggerPrice = cta ? (cta?.identified_levels?.trigger_price || (Array.isArray(cta?.chart_resistances) && cta.chart_resistances[0]) || '—') : 'In attesa di analisi Grafico AI';
+                      const supportPrice = cta ? (cta?.identified_levels?.support_price || (Array.isArray(cta?.chart_supports) && cta.chart_supports[0]) || '—') : 'In attesa di analisi Grafico AI';
+
+                      const activeBar = hoveredBar ? hoveredBar : (clickedBar ? clickedBar : (chartHistoryBars.length > 0 ? chartHistoryBars[chartHistoryBars.length - 1] : null));
+                      const displayDate = activeBar ? activeBar.date : (data?.search_metadata?.timestamp_utc ? new Date(data.search_metadata.timestamp_utc).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+                      const displayClose = activeBar ? `${activeBar.close} €` : (typeof currentClose === 'number' ? `${currentClose} €` : currentClose);
+                      const displayChange = activeBar ? (typeof activeBar.change_pct === 'number' ? activeBar.change_pct : (parseFloat(activeBar.change_pct) || 0.0)) : 0.0;
+                      const isPos = displayChange >= 0;
+
+                      const handleMouseMove = (e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const x = e.clientX - rect.left;
+                        const pct = x / rect.width;
+                        setCrosshairPos(x);
+                        if (chartHistoryBars && chartHistoryBars.length > 0) {
+                          const plotPct = Math.min(Math.max(0, (pct - 0.065) / 0.80), 1);
+                          const idx = Math.min(Math.max(0, Math.round(plotPct * (chartHistoryBars.length - 1))), chartHistoryBars.length - 1);
+                          const bar = chartHistoryBars[idx];
+                          if (bar) { setHoveredBar(bar); }
+                        }
+                      };
+
+                      const handleChartClick = (e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const x = e.clientX - rect.left;
+                        const pct = x / rect.width;
+                        if (chartHistoryBars && chartHistoryBars.length > 0) {
+                          const plotPct = Math.min(Math.max(0, (pct - 0.065) / 0.80), 1);
+                          const idx = Math.min(Math.max(0, Math.round(plotPct * (chartHistoryBars.length - 1))), chartHistoryBars.length - 1);
+                          const bar = chartHistoryBars[idx];
+                          if (bar) { setClickedBar(bar); }
+                        }
+                      };
+
+                      const handleMouseLeave = () => {
+                        setCrosshairPos(null);
+                        setHoveredBar(null);
+                      };
+
+                      return (
+                        <>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.7rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '0.25rem 0.65rem', borderRadius: '6px' }}>
+                              🔵 PREZZO {currentClose}
+                            </div>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', padding: '0.25rem 0.65rem', borderRadius: '6px' }}>
+                              🔴 TRIGGER {triggerPrice}
+                            </div>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '0.25rem 0.65rem', borderRadius: '6px' }}>
+                              🟢 SUPPORTO {supportPrice}
+                            </div>
+                          </div>
+
+                          {/* MAIN CHART IMAGES DISPLAY */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                            {chartList.map((chartItem) => (
+                              <div key={chartItem.id} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', background: '#ffffff' }}>
+                                <div style={{ padding: '0.5rem 0.8rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: 700, fontSize: '0.84rem', color: '#1e293b' }}>
+                                  {chartItem.title}
+                                </div>
+                                <div
+                                  onMouseMove={handleMouseMove}
+                                  onMouseLeave={handleMouseLeave}
+                                  onClick={handleChartClick}
+                                  onDragStart={(e) => e.preventDefault()}
+                                  style={{ position: 'relative', width: '100%', cursor: 'crosshair', userSelect: 'none' }}
+                                >
+                                  {crosshairPos !== null && (
+                                    <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${crosshairPos}px`, width: '1px', borderLeft: '1px dashed #64748b', pointerEvents: 'none', zIndex: 20 }} />
+                                  )}
+                                  <img
+                                    src={`${chartItem.url}?v=${chartVersion}`}
+                                    alt={chartItem.title}
+                                    draggable={false}
+                                    onDragStart={(e) => e.preventDefault()}
+                                    onMouseMove={handleMouseMove}
+                                    onMouseLeave={handleMouseLeave}
+                                    onClick={handleChartClick}
+                                    style={{ width: '100%', display: 'block', minHeight: '260px', objectFit: 'contain', userSelect: 'none', WebkitUserDrag: 'none' }}
+                                    onError={(e) => {
+                                      const fallbackUrl = `http://localhost:3001/finance_charts/${row.ticker}_momentum.png`;
+                                      const priceUrl = `http://localhost:3001/finance_charts/${row.ticker}_price_alligator.png`;
+                                      if (e.target.src !== fallbackUrl && e.target.src !== priceUrl) {
+                                        e.target.src = fallbackUrl;
+                                      } else if (e.target.src === fallbackUrl) {
+                                        e.target.src = priceUrl;
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* BOTTOM SUMMARY INFO CARDS */}
+                          <div style={{ display: 'flex', gap: '1rem', marginTop: '1.2rem', flexWrap: 'wrap' }}>
+                            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.6rem 1rem', flex: '1', minWidth: '130px' }}>
+                              <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Data</div>
+                              <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>{displayDate}</div>
+                            </div>
+                            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.6rem 1rem', flex: '1', minWidth: '130px' }}>
+                              <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Chiusura</div>
+                              <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>{displayClose}</div>
+                            </div>
+                            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.6rem 1rem', flex: '1', minWidth: '160px' }}>
+                              <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Variazione giorno</div>
+                              <div style={{ marginTop: '3px' }}>
+                                <span style={{ display: 'inline-block', padding: '0.15rem 0.5rem', borderRadius: '6px', fontSize: '0.9rem', fontWeight: 800, background: isPos ? '#dcfce7' : '#fee2e2', color: isPos ? '#15803d' : '#991b1b' }}>
+                                  {isPos ? '+' : ''}{displayChange}%
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* FOOTER INSPECTION NOTE */}
+                          {clickedBar ? (
+                            <div style={{ marginTop: '0.8rem', padding: '0.75rem 1rem', background: '#eff6ff', borderRadius: '10px', border: '1px solid #93c5fd', color: '#1e3a8a', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
+                              <div style={{ fontSize: '0.84rem' }}>
+                                <strong style={{ color: '#1d4ed8', fontSize: '0.9rem' }}>📌 Nota Ispezione Barra del {clickedBar.date}:</strong> &nbsp;
+                                <span>Chiusura: <strong>{clickedBar.close} €</strong> &nbsp;|&nbsp; </span>
+                                <span>Apertura: <strong>{clickedBar.open} €</strong> &nbsp;|&nbsp; </span>
+                                <span>Massimo: <strong>{clickedBar.high} €</strong> &nbsp;|&nbsp; </span>
+                                <span>Minimo: <strong>{clickedBar.low} €</strong> &nbsp;|&nbsp; </span>
+                                <span>Variazione 1D: <strong style={{ color: clickedBar.change_pct >= 0 ? '#15803d' : '#b91c1c' }}>{clickedBar.change_pct >= 0 ? '+' : ''}{clickedBar.change_pct}%</strong> &nbsp;|&nbsp; </span>
+                                <span>Volumi: <strong>{clickedBar.volume?.toLocaleString('it-IT') || '—'}</strong></span>
+                              </div>
+                              <button onClick={() => setClickedBar(null)} style={{ background: '#ffffff', border: '1px solid #93c5fd', color: '#1e40af', padding: '0.25rem 0.6rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}>
+                                ✕ Sblocca
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ marginTop: '0.6rem', fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic' }}>
+                              💡 <em>Fai click su qualsiasi candela del grafico per fissare i dati di quel giorno nella nota a piè di pagina.</em>
+                            </div>
+                          )}
+
+                          {/* CHATGPT VISION DETAILS CARD */}
+                          {cta && (
+                            <div style={{ marginTop: '1.2rem', padding: '1rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                              <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
+                                <span>🤖 Analisi Visuale Grafico AI (Playwright Vision)</span>
+                                <span style={{ fontSize: '0.78rem', background: '#e0e7ff', color: '#3730a3', padding: '3px 10px', borderRadius: '12px', fontWeight: 700 }}>
+                                  Trend Rilevato: {cta.overall_trend || 'Analizzato'}
+                                </span>
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.9rem', fontSize: '0.84rem', color: '#334155' }}>
+                                {cta.key_scenario && (
+                                  <div style={{ gridColumn: '1 / -1', background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #cbd5e1', boxShadow: '0 2px 5px rgba(0,0,0,0.03)' }}>
+                                    <strong style={{ color: '#15803d', fontSize: '0.92rem' }}>🎯 Scenario Principale Grafico AI:</strong>
+                                    <div style={{ marginTop: '6px', color: '#0f172a', lineHeight: 1.55, fontSize: '0.88rem' }}>{cta.key_scenario}</div>
+                                  </div>
+                                )}
+                                {cta.operational_note && (
+                                  <div style={{ gridColumn: '1 / -1', fontStyle: 'italic', color: '#334155', background: '#eff6ff', padding: '0.65rem 0.9rem', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+                                    💡 <strong style={{ color: '#1d4ed8' }}>Nota Operativa Prudente:</strong> {cta.operational_note}
+                                  </div>
+                                )}
+                                <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', borderLeft: '4px solid #16a34a', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                  <strong style={{ color: '#16a34a' }}>🟢 Supporti Grafici (Vision S1, S2):</strong>
+                                  <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>{(cta.chart_supports || []).join(', ') || supportPrice}</div>
+                                </div>
+                                <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', borderLeft: '4px solid #dc2626', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                  <strong style={{ color: '#dc2626' }}>🔴 Resistenze / Trigger (Vision R1, R2):</strong>
+                                  <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>{(cta.chart_resistances || []).join(', ') || triggerPrice}</div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+              </React.Fragment>
             );
           })}
         </div>
