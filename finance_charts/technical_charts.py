@@ -273,26 +273,41 @@ def plot_price_alligator(df, ticker, output_path, days=252, chart_type="candlest
         pass
 
     last_close = float(view["Close"].iloc[-1])
-    recent_lows = float(view["Low"].min())
-    recent_highs = float(view["High"].max())
+    abs_lows = float(view["Low"].min())
+    abs_highs = float(view["High"].max())
+
+    # Calcola livello trigger e supporto di breve termine (ultime 25 sessioni) per allineamento perfetto con Vision AI
+    recent_window = min(25, len(view))
+    imm_highs = float(view["High"].tail(recent_window).max())
+    imm_lows = float(view["Low"].tail(recent_window).min())
 
     # Linea PREZZO (Blu)
     ax.axhline(last_close, color="#2563eb", linestyle="--", linewidth=1.8, alpha=0.9)
     ax.text(x[-1] + 0.5, last_close, f"  PREZZO {last_close:.2f}", color="#2563eb", fontweight="bold", fontsize=10, va="center")
 
-    # Linea TRIGGER / RESISTENZA (Rosso)
-    trigger_level = recent_highs
+    # Linea TRIGGER DI BREVE (Rosso Tratteggiato)
+    trigger_level = imm_highs
     ax.axhline(trigger_level, color="#dc2626", linestyle="--", linewidth=1.8, alpha=0.9)
     ax.text(x[-1] + 0.5, trigger_level, f"  TRIGGER {trigger_level:.2f}", color="#dc2626", fontweight="bold", fontsize=10, va="center")
 
-    # Linea SUPPORTO (Verde)
-    support_level = recent_lows
+    # Se esiste un massimo assoluto superiore al trigger di breve, mostralo come Resistenza Max (Puntinato)
+    if abs_highs > trigger_level * 1.015:
+        ax.axhline(abs_highs, color="#ef4444", linestyle=":", linewidth=1.4, alpha=0.7)
+        ax.text(x[-1] + 0.5, abs_highs, f"  RES MAX {abs_highs:.2f}", color="#ef4444", fontweight="bold", fontsize=9, va="center")
+
+    # Linea SUPPORTO DI BREVE (Verde Tratteggiato)
+    support_level = imm_lows
     ax.axhline(support_level, color="#16a34a", linestyle="--", linewidth=1.8, alpha=0.9)
     ax.text(x[-1] + 0.5, support_level, f"  SUPPORTO {support_level:.2f}", color="#16a34a", fontweight="bold", fontsize=10, va="center")
 
-    # Set clean Y-axis limits dynamically centered around actual price range (with top padding for legend & badges)
-    price_min = recent_lows
-    price_max = recent_highs
+    # Se esiste un minimo assoluto inferiore al supporto di breve, mostralo come Supporto Min (Puntinato)
+    if abs_lows < support_level * 0.985:
+        ax.axhline(abs_lows, color="#22c55e", linestyle=":", linewidth=1.4, alpha=0.7)
+        ax.text(x[-1] + 0.5, abs_lows, f"  SUP MIN {abs_lows:.2f}", color="#22c55e", fontweight="bold", fontsize=9, va="center")
+
+    # Set clean Y-axis limits dynamically centered around actual price range
+    price_min = abs_lows
+    price_max = abs_highs
     y_range = max(price_max - price_min, 0.5)
     ax.set_ylim(price_min - y_range * 0.06, price_max + y_range * 0.18)
 
