@@ -65,23 +65,40 @@ STOCK_CATALOG = {
 }
 
 def find_gemini_prompt_box(page):
+    # Gestione eventuali banner cookie o login Google
+    try:
+        cookie_btns = page.locator("button:has-text('Accetta tutto'), button:has-text('Accept all'), button:has-text('Accetto')")
+        if cookie_btns.count() > 0:
+            cookie_btns.first.click()
+            page.wait_for_timeout(1000)
+    except Exception:
+        pass
+
     selectors = [
+        "div[role='textbox']",
         "rich-textarea div[contenteditable='true']",
+        "rich-textarea p",
         "div[contenteditable='true']",
         "p.is-empty",
         "textarea",
         "[aria-label*='Prompt']",
         "[aria-label*='Chiedi']",
-        "[aria-label*='Ask']"
+        "[aria-label*='Ask']",
+        "[aria-label*='Inserisci']"
     ]
     for selector in selectors:
         locator = page.locator(selector).last
         try:
-            locator.wait_for(state="visible", timeout=4000)
+            locator.wait_for(state="visible", timeout=3000)
             return locator
         except (PlaywrightTimeoutError, PlaywrightError):
             continue
-    raise RuntimeError("Campo prompt Gemini Web non trovato. Verifica che la pagina https://gemini.google.com/app sia caricata.")
+
+    # Verifica se la pagina richiede login Google
+    if "accounts.google.com" in page.url or page.locator("a[href*='accounts.google.com'], button:has-text('Accedi')").count() > 0:
+        safe_print("⚠️ Attenzione: Serve effettuare l'accesso con il tuo account Google nella finestra di Chrome.")
+
+    raise RuntimeError("Campo prompt Gemini Web non trovato. Effettua l'accesso su https://gemini.google.com/app nella finestra Chrome visibile.")
 
 def send_gemini_prompt(page, prompt):
     initial_count = page.locator("message-content, div.model-response-text, .markdown").count()
