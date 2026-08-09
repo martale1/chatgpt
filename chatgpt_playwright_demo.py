@@ -330,18 +330,40 @@ def wait_for_response(page, initial_assistant_count=0, timeout_seconds=RESPONSE_
 
 
 def open_chatgpt_page(context_or_browser):
-    page = context_or_browser.new_page()
-    # Apre SEMPRE una nuova conversazione per evitare contaminazione dal contesto precedente
-    page.goto("https://chatgpt.com/", wait_until="domcontentloaded")
+    page = None
+    try:
+        pages = context_or_browser.pages if hasattr(context_or_browser, 'pages') else []
+        for p in pages:
+            try:
+                if "chatgpt.com" in p.url:
+                    page = p
+                    page.bring_to_front()
+                    break
+            except Exception:
+                continue
+        if page is None:
+            page = context_or_browser.new_page()
+    except Exception:
+        try:
+            page = context_or_browser.new_page()
+        except Exception:
+            if hasattr(context_or_browser, 'browser') and context_or_browser.browser:
+                new_ctx = context_or_browser.browser.new_context()
+                page = new_ctx.new_page()
+            else:
+                raise
+
+    if "chatgpt.com" not in page.url:
+        page.goto("https://chatgpt.com/", wait_until="domcontentloaded")
     page.bring_to_front()
-    # Naviga a una nuova chat vuota
+    
+    # Naviga a una nuova chat vuota per evitare contaminazioni
     try:
         new_chat_btn = page.locator("a[href='/']").first
         new_chat_btn.wait_for(state="visible", timeout=3000)
         new_chat_btn.click()
         page.wait_for_load_state("domcontentloaded")
     except Exception:
-        # Fallback: naviga direttamente a /new
         try:
             page.goto("https://chatgpt.com/new", wait_until="domcontentloaded")
         except Exception:
@@ -576,7 +598,7 @@ def main():
         if args.cdp:
             try:
                 safe_print(f"Tentativo di connessione a Chrome via CDP ({args.cdp})...")
-                browser = p.chromium.connect_over_cdp(args.cdp)
+                browser = p.chromium.connect_over_cdp(args.cdp, timeout=5000)
                 context = browser.contexts[0] if browser.contexts else browser.new_context()
                 use_cdp = True
                 safe_print("Connessione CDP stabilita con successo!")

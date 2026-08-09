@@ -336,6 +336,7 @@ print(json.dumps({'bars': bars, 'metrics': metrics}))
     const chartType = parsedUrl.query.chart_type || 'candlestick';
 
     const args = [
+      '-u',
       path.join(__dirname, 'chatgpt_playwright_demo.py'),
       '--ticker', ticker,
       '--company', info.company,

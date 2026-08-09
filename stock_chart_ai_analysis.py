@@ -270,8 +270,17 @@ def main():
         return
 
     with sync_playwright() as p:
-        browser = p.chromium.connect_over_cdp(args.cdp)
-        context = browser.contexts[0] if browser.contexts else browser.new_context()
+        try:
+            browser = p.chromium.connect_over_cdp(args.cdp, timeout=5000)
+            context = browser.contexts[0] if browser.contexts else browser.new_context()
+        except Exception as exc:
+            safe_print(f"Impossibile connettersi via CDP ({exc}). Avvio browser Chrome...")
+            context = p.chromium.launch_persistent_context(
+                user_data_dir="chrome_chatgpt_profile",
+                headless=False,
+                viewport={"width": 1400, "height": 900},
+                channel="chrome"
+            )
         for bundle in bundles:
             ticker = bundle["ticker"]
             prompt = build_prompt(ticker, bundle["snapshot"])
