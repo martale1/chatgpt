@@ -330,8 +330,8 @@ print(json.dumps({'bars': bars, 'metrics': metrics}))
       'Access-Control-Allow-Origin': '*'
     });
     
-    const scriptName = engine === 'chatgpt' ? 'chatgpt_playwright_demo.py' : 'gemini_agent.py';
-    res.write(`data: ${JSON.stringify({ type: 'log', agent: 'Controller & Orchestrator Agent', msg: `Avvio Agente ${engine === 'chatgpt' ? 'ChatGPT Playwright Web' : 'Google Gemini AI Engine'} per il ticker: ${ticker}` })}\n\n`);
+    const scriptName = engine === 'chatgpt' ? 'chatgpt_playwright_demo.py' : 'gemini_playwright_demo.py';
+    res.write(`data: ${JSON.stringify({ type: 'log', agent: 'Controller & Orchestrator Agent', msg: `Avvio Agente Playwright (${engine === 'chatgpt' ? 'ChatGPT Web' : 'Gemini Web'} + OpenAI Agent) per il ticker: ${ticker}` })}\n\n`);
 
     const period = parsedUrl.query.period || '1y';
     const days = parsedUrl.query.days || '252';
