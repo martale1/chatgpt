@@ -387,7 +387,8 @@ print(json.dumps({'bars': bars, 'metrics': metrics}))
         }
 
         if (!chatGptResponse || chatGptResponse.trim().length < 50) {
-          runFallbackAnalysis(ticker, info, isChart, res);
+          res.write(`data: ${JSON.stringify({ type: 'error', msg: `Nessuna risposta valida ricevuta da ChatGPT. Controlla che la sessione sia attiva.` })}\n\n`);
+          res.end();
           return;
         }
 
@@ -395,10 +396,11 @@ print(json.dumps({'bars': bars, 'metrics': metrics}))
         const parsedData = parseReport(chatGptResponse, ticker.trim().toUpperCase(), info.company);
         saveTickerAnalysis(cacheKey, parsedData);
         res.write(`data: ${JSON.stringify({ type: 'data', data: parsedData, isChart: isChart })}\n\n`);
-        res.end();
       } catch (err) {
-        runFallbackAnalysis(ticker, info, isChart, res);
+        res.write(`data: ${JSON.stringify({ type: 'error', msg: `Errore parsing report: ${err.message}` })}\n\n`);
       }
+
+      res.end();
     });
 
   } else {
@@ -406,81 +408,6 @@ print(json.dumps({'bars': bars, 'metrics': metrics}))
     meRes.end('Not Found');
   }
 });
-
-function runFallbackAnalysis(ticker, info, isChart, res) {
-  res.write(`data: ${JSON.stringify({ type: 'log', agent: 'Controller & Orchestrator Agent', msg: `⚡ Attivo Fallback Live per ${ticker} (Yahoo Finance & News API)...` })}\n\n`);
-  
-  const pyCode = `
-import json, yfinance as yf
-tk = yf.Ticker('${ticker}')
-hist = tk.history(period='1mo')
-last_c = round(float(hist['Close'].iloc[-1]), 2) if len(hist) > 0 else 0.0
-news = tk.news or []
-recent_news = []
-for idx, n in enumerate(news[:6]):
-    content = n.get('content', {})
-    title = content.get('title') or n.get('title', f'Notizia {ticker}')
-    provider = content.get('provider', {}).get('displayName') or 'Yahoo Finance'
-    pubDate = content.get('pubDate') or ''
-    summary = content.get('summary') or title
-    recent_news.append({
-        "id": f"news_{idx+1}",
-        "headline": title,
-        "date": pubDate[:10] if pubDate else "",
-        "source": provider,
-        "source_domain": "finance.yahoo.com",
-        "url": n.get('link') or content.get('canonicalUrl', {}).get('url'),
-        "category": "Market / Corporate News",
-        "summary": summary,
-        "detail": summary,
-        "sentiment": "Neutro",
-        "impact_rating": "Medio"
-    })
-
-data = {
-    "search_metadata": {
-        "query_input": "${ticker}",
-        "company_name": "${info.company}",
-        "ticker": "${ticker}",
-        "market": "${info.market}",
-        "current_market_price": last_c,
-        "timestamp_utc": str(hist.index[-1].date()) if len(hist) > 0 else ""
-    },
-    "market_sentiment_summary": {
-        "overall_sentiment": "Neutro",
-        "sentiment_score": 0.5,
-        "expected_impact": "Consolidamento",
-        "summary_explanation": f"Analisi live aggiornata da Yahoo Finance per ${info.company} (${ticker}). Prezzo di chiusura corrente: {last_c} €.",
-        "news_highlights": [n["headline"] for n in recent_news[:3]]
-    },
-    "recent_news_last_3_days": recent_news[:3],
-    "latest_available_news": recent_news,
-    "analyst_ratings_and_targets": [],
-    "technical_levels": {
-        "supports": [f"{round(last_c * 0.95, 2)} €"],
-        "resistances": [f"{round(last_c * 1.05, 2)} €"],
-        "critical_levels_notes": f"Supporti e resistenze di breve periodo calcolati attorno a {last_c} €."
-    }
-}
-print(json.dumps(data))
-  `;
-
-  const pyProc = spawn(PYTHON_PATH, ['-c', pyCode], { shell: false });
-  let out = '';
-  pyProc.stdout.on('data', chunk => { out += chunk.toString(); });
-  pyProc.on('close', () => {
-    try {
-      const parsedData = JSON.parse(out.trim());
-      const cacheKey = isChart ? (ticker.trim().toUpperCase() + '_CHART') : ticker.trim().toUpperCase();
-      saveTickerAnalysis(cacheKey, parsedData);
-      res.write(`data: ${JSON.stringify({ type: 'log', agent: 'Controller & Orchestrator Agent', msg: `✅ Fallback completato con successo per ${ticker}!` })}\n\n`);
-      res.write(`data: ${JSON.stringify({ type: 'data', data: parsedData, isChart: isChart })}\n\n`);
-    } catch (e) {
-      res.write(`data: ${JSON.stringify({ type: 'error', msg: `Errore generatore fallback: ${e.message}` })}\n\n`);
-    }
-    res.end();
-  });
-}
 
 server.listen(PORT, () => {
   console.log(`Backend bridge server running on http://localhost:${PORT}`);
