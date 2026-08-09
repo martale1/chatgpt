@@ -181,6 +181,11 @@ export default function App() {
   const [chartVersion, setChartVersion] = useState(Date.now());
   const [showJsonOutput, setShowJsonOutput] = useState(false);
 
+  // ── Scroll sempre in cima alla pagina quando si cambia tab o ticker ──────
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [activeTab, query]);
+
   // ── Sincronizzazione con Server Backend (per la persistenza multi-browser) ──
   useEffect(() => {
     fetch('http://localhost:3001/api/all-data')
@@ -199,7 +204,7 @@ export default function App() {
           }
         }
         if (resData?.watchlists && typeof resData.watchlists === 'object' && Object.keys(resData.watchlists).length > 0) {
-          setWatchlists(prev => ({ ...prev, ...resData.watchlists }));
+          setWatchlists(resData.watchlists);
         }
       })
       .catch(() => {});
@@ -578,10 +583,15 @@ export default function App() {
 
   // ── Rimuovi ticker dalla watchlist attiva ────────────────────────────────
   const removeFromWatchlist = (targetToRemove) => {
-    updateCurrentWatchlist(prev => prev.filter(t => t !== targetToRemove));
+    updateCurrentWatchlist(prev => {
+      const updated = prev.filter(t => t !== targetToRemove);
+      return updated;
+    });
     setRealTickerData(prev => {
       const copy = { ...prev };
       delete copy[targetToRemove];
+      delete copy[`${targetToRemove}_CHART`];
+      localStorage.setItem('real_ticker_data', JSON.stringify(copy));
       return copy;
     });
     if (query === targetToRemove) {
