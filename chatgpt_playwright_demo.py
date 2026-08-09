@@ -303,11 +303,38 @@ def wait_for_response(page, initial_assistant_count=0, timeout_seconds=RESPONSE_
         page.wait_for_timeout(step_ms)
         elapsed_ms += step_ms
 
-        messages = page.locator("[data-message-author-role='assistant']")
-        count = messages.count()
-        if count <= initial_assistant_count:
+        # Selettori flessibili per l'assistente ChatGPT (inclusi web search pills)
+        selectors = [
+            "[data-message-author-role='assistant']",
+            "article[data-testid*='conversation-turn-assistant']",
+            "div.agent-turn",
+            "div.markdown.prose"
+        ]
+        
+        messages = None
+        count = 0
+        for sel in selectors:
+            loc = page.locator(sel)
+            c = loc.count()
+            if c > 0:
+                messages = loc
+                count = c
+                break
+
+        if messages is None or count <= initial_assistant_count:
             if elapsed_ms % 10000 == 0:
-                safe_print(f"Ancora nessuna nuova risposta dopo {elapsed_ms // 1000}s...")
+                # Controlla se ChatGPT sta effettuando ricerche web in background
+                is_searching = False
+                try:
+                    search_indicators = page.locator("button:has-text('Searching'), div:has-text('Searching'), [aria-label*='Searching']").count()
+                    if search_indicators > 0:
+                        is_searching = True
+                except Exception:
+                    pass
+                if is_searching:
+                    safe_print(f"🔍 ChatGPT sta effettuando la ricerca web in tempo reale... ({elapsed_ms // 1000}s)")
+                else:
+                    safe_print(f"⏳ In attesa della risposta di ChatGPT ({elapsed_ms // 1000}s)...")
             continue
 
         try:
@@ -320,7 +347,7 @@ def wait_for_response(page, initial_assistant_count=0, timeout_seconds=RESPONSE_
         else:
             stable_reads = 0
             last_text = current_text
-            safe_print(f"Risposta in corso: {len(last_text)} caratteri...")
+            safe_print(f"Risposta in corso: {len(last_text)} caratteri ricevuti...")
 
         if last_text and stable_reads >= 2:
             return last_text
