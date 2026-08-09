@@ -100,12 +100,37 @@ def find_gemini_prompt_box(page):
 
     raise RuntimeError("Campo prompt Gemini Web non trovato. Effettua l'accesso su https://gemini.google.com/app nella finestra Chrome visibile.")
 
+def dismiss_overlay_modals(page):
+    try:
+        overlays = page.locator("button:has-text('Accetta'), button:has-text('Accetto'), button:has-text('Accept'), button:has-text('Rifiuta'), button:has-text('Capito'), button[aria-label*='Chiudi']")
+        for i in range(overlays.count()):
+            try:
+                el = overlays.nth(i)
+                if el.is_visible(timeout=500):
+                    el.click(force=True)
+                    page.wait_for_timeout(300)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
 def send_gemini_prompt(page, prompt):
+    dismiss_overlay_modals(page)
     initial_count = page.locator("message-content, div.model-response-text, .markdown").count()
     box = find_gemini_prompt_box(page)
     safe_print("Campo prompt Gemini Web trovato.")
-    box.click()
+    
+    try:
+        box.click(timeout=3000)
+    except Exception:
+        dismiss_overlay_modals(page)
+        try:
+            box.click(force=True, timeout=3000)
+        except Exception:
+            box.focus()
+
     box.fill(prompt)
+    page.wait_for_timeout(500)
     safe_print("Prompt inserito in Gemini Web, invio in corso...")
     
     send_selectors = [
