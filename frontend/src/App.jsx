@@ -671,6 +671,7 @@ export default function App() {
   // Watchlist rows: mostra solo dati reali ricevuti, altrimenti stato "non analizzato"
   const watchlistRows = watchlist.map((t) => {
     const d = realTickerData[t] || null;
+    const chartD = realTickerData[`${t}_CHART`] || null;
     const s = d?.market_sentiment_summary;
     const score = s?.sentiment_score ?? null;
     const col = score !== null
@@ -678,6 +679,16 @@ export default function App() {
       : { bg: 'rgba(100,116,139,0.08)', border: '#475569', text: '#94a3b8', label: '—' };
     const timestamp = d?.search_metadata?.timestamp_utc
       ? new Date(d.search_metadata.timestamp_utc).toLocaleString('it-IT', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      : null;
+
+    const chartTimestamp = chartD?.search_metadata?.timestamp_utc
+      ? new Date(chartD.search_metadata.timestamp_utc).toLocaleString('it-IT', {
           day: '2-digit',
           month: '2-digit',
           year: 'numeric',
@@ -696,6 +707,7 @@ export default function App() {
       market: d?.search_metadata?.market || '—',
       analyzed: !!d,
       timestamp,
+      chartTimestamp,
       currentPrice,
       bestUpsideItem,
       score,
@@ -987,8 +999,13 @@ export default function App() {
                     {row.ticker}
                     <span className="wt-company">{row.company}</span>
                     {row.timestamp && (
-                      <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px', display: 'block', fontWeight: 'normal' }}>
-                        📅 {row.timestamp}
+                      <span style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px', display: 'block', fontWeight: 'normal' }}>
+                        📰 {row.timestamp}
+                      </span>
+                    )}
+                    {row.chartTimestamp && (
+                      <span style={{ fontSize: '0.68rem', color: '#c084fc', marginTop: '1px', display: 'block', fontWeight: 'normal' }}>
+                        📊 {row.chartTimestamp}
                       </span>
                     )}
                   </span>
@@ -1288,13 +1305,25 @@ export default function App() {
                                  ⚡ Aggiorna Entrambi
                                </button>
 
-                              {data.search_metadata.timestamp_utc && (
-                                <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#94a3b8', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                  📅 Analisi del: {new Date(data.search_metadata.timestamp_utc).toLocaleString('it-IT', {
-                                    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                                  })}
-                                </span>
-                              )}
+                               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                                 {data.search_metadata.timestamp_utc && (
+                                   <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                     📰 News: {new Date(data.search_metadata.timestamp_utc).toLocaleString('it-IT', {
+                                       day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                     })}
+                                   </span>
+                                 )}
+                                 {(() => {
+                                   const chartData = realTickerData[(query || data?.search_metadata?.ticker) + '_CHART'];
+                                   return chartData?.search_metadata?.timestamp_utc && (
+                                     <span style={{ fontSize: '0.78rem', background: '#faf5ff', border: '1px solid #e9d5ff', color: '#7e22ce', padding: '0.15rem 0.55rem', borderRadius: '6px', fontWeight: '600' }}>
+                                       📊 Grafico AI: {new Date(chartData.search_metadata.timestamp_utc).toLocaleString('it-IT', {
+                                         day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                       })}
+                                     </span>
+                                   );
+                                 })()}
+                               </div>
                             </div>
 
                             <div className="summary-grid">
