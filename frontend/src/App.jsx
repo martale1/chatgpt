@@ -1671,8 +1671,18 @@ export default function App() {
                                   {/* CHATGPT VISION DETAILS CARD */}
                                   {cta ? (
                                     <div style={{ marginTop: '1.2rem', padding: '1rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                                      <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
-                                        <span>🤖 Analisi Visuale Grafico AI (Playwright Vision)</span>
+                                      <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                                          <span>🤖 Analisi Visuale Grafico AI (Playwright Vision)</span>
+                                          {(() => {
+                                            const chartD = realTickerData[(query || data?.search_metadata?.ticker) + '_CHART'];
+                                            return chartD?.search_metadata?.timestamp_utc && (
+                                              <span style={{ fontSize: '0.75rem', background: '#faf5ff', border: '1px solid #d8b4fe', color: '#7e22ce', padding: '3px 9px', borderRadius: '8px', fontWeight: 700 }}>
+                                                📅 Aggiornato: {new Date(chartD.search_metadata.timestamp_utc).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                              </span>
+                                            );
+                                          })()}
+                                        </div>
                                         <span style={{ fontSize: '0.78rem', background: '#e0e7ff', color: '#3730a3', padding: '3px 10px', borderRadius: '12px', fontWeight: 700 }}>
                                           Trend Rilevato: {cta.overall_trend || cta.trend_direction || 'Analizzato'}
                                         </span>
@@ -1705,6 +1715,54 @@ export default function App() {
                                           <strong style={{ color: '#dc2626' }}>🔴 Resistenze / Trigger (Vision R1, R2):</strong>
                                           <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>{(cta.chart_resistances || [cta.breakout_trigger, cta.structural_resistance]).filter(Boolean).join(', ') || triggerPrice}</div>
                                         </div>
+
+                                         {/* SEZIONE ANALISI TECNICA DI DETTAGLIO (INDICATORI & PATTERN CANDELE) */}
+                                         {(cta.candlestick_analysis || cta.alligator_ma_analysis || cta.macd_adx_analysis || cta.volume_oscillator_analysis || cta.chart_pattern) && (
+                                           <div style={{ gridColumn: '1 / -1', marginTop: '0.6rem', paddingTop: '0.8rem', borderTop: '1px dashed #cbd5e1' }}>
+                                             <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e293b', marginBottom: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                               📐 <span>Analisi Tecnica di Dettaglio (Indicatori &amp; Pattern Candele)</span>
+                                             </div>
+                                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
+                                               
+                                               {(cta.candlestick_analysis || cta.chart_pattern) && (
+                                                 <div style={{ background: '#ffffff', padding: '0.75rem 0.9rem', borderRadius: '10px', border: '1px solid #e2e8f0', borderLeft: '4px solid #8b5cf6', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                                                   <strong style={{ color: '#7c3aed', fontSize: '0.84rem' }}>🕯️ Pattern Candele &amp; Price Action:</strong>
+                                                   <div style={{ marginTop: '5px', color: '#1e293b', fontSize: '0.83rem', lineHeight: 1.5 }}>
+                                                     {cta.candlestick_analysis || `Pattern grafico identificato: ${cta.chart_pattern}`}
+                                                   </div>
+                                                 </div>
+                                               )}
+
+                                               {cta.alligator_ma_analysis && (
+                                                 <div style={{ background: '#ffffff', padding: '0.75rem 0.9rem', borderRadius: '10px', border: '1px solid #e2e8f0', borderLeft: '4px solid #0284c7', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                                                   <strong style={{ color: '#0369a1', fontSize: '0.84rem' }}>🐊 Williams Alligator &amp; Medie (Jaw, Teeth, Lips, EMA):</strong>
+                                                   <div style={{ marginTop: '5px', color: '#1e293b', fontSize: '0.83rem', lineHeight: 1.5 }}>
+                                                     {cta.alligator_ma_analysis}
+                                                   </div>
+                                                 </div>
+                                               )}
+
+                                               {cta.macd_adx_analysis && (
+                                                 <div style={{ background: '#ffffff', padding: '0.75rem 0.9rem', borderRadius: '10px', border: '1px solid #e2e8f0', borderLeft: '4px solid #d97706', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                                                   <strong style={{ color: '#b45309', fontSize: '0.84rem' }}>📉 MACD &amp; ADX (Forza del Trend &amp; Momentum):</strong>
+                                                   <div style={{ marginTop: '5px', color: '#1e293b', fontSize: '0.83rem', lineHeight: 1.5 }}>
+                                                     {cta.macd_adx_analysis}
+                                                   </div>
+                                                 </div>
+                                               )}
+
+                                               {cta.volume_oscillator_analysis && (
+                                                 <div style={{ background: '#ffffff', padding: '0.75rem 0.9rem', borderRadius: '10px', border: '1px solid #e2e8f0', borderLeft: '4px solid #059669', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                                                   <strong style={{ color: '#047857', fontSize: '0.84rem' }}>📊 Volumi &amp; Oscillatori (RSI / Stocastico):</strong>
+                                                   <div style={{ marginTop: '5px', color: '#1e293b', fontSize: '0.83rem', lineHeight: 1.5 }}>
+                                                     {cta.volume_oscillator_analysis}
+                                                   </div>
+                                                 </div>
+                                               )}
+
+                                             </div>
+                                           </div>
+                                         )}
                                       </div>
                                     </div>
                                   ) : (

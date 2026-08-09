@@ -250,14 +250,18 @@ def parse_with_openai_agent(raw_gemini_text, ticker, company, market, is_chart=F
     safe_print(f"🤖 OpenAI Agent: Formattazione approfondita {'ANALISI GRAFICO VISION' if is_chart else 'RICERCA NEWS & MARKET'} da Gemini Web...")
 
     system_prompt = (
-        "Sei un analista tecnico senior dei mercati finanziari. "
-        "Per l'analisi del grafico, devi fornire una descrizione ricca, dettagliata ed approfondita della price action, del trend, "
-        "degli indicatori (Alligator, MACD, RSI, Parabolic SAR) e formulare una NOTA OPERATIVA PRUDENTE ed azionabile per i trader. "
+        "Sei un analista tecnico ed esperto di analisi quantitativa e candlestick pattern dei mercati finanziari. "
+        "Per l'analisi del grafico, devi analizzare visivamente in modo rigoroso e completo: "
+        "1. Pattern di candele giapponesi (Doji, Engulfing, Hammer, Marubozu, Harami, ombre superiori/inferiori e figure tecniche come Doppio Minimo/Massimo, Testa e Spalle, Flag). "
+        "2. Williams Alligator (Jaw 13, Teeth 8, Lips 5) e allineamento medie mobili EMA30/EMA50. "
+        "3. MACD (incrocio con Signal line, istogramma del momentum) e ADX con DI+ e DI- per la forza del trend. "
+        "4. Volumi di scambio e oscillatori di ipercomprato/ipervenduto (RSI e Stocastico). "
+        "5. Formulare uno Scenario Principale ed una NOTA OPERATIVA PRUDENTE con trigger e stop-loss. "
         "REGOLA TASSATIVA: NON INCLUDERE NOTIZIE SOCIETARIE O DATI FONDAMENTALI NELL'ANALISI DEL GRAFICO."
     )
 
     if is_chart:
-        user_prompt = f"""Esegui un'ANALISI GRAFICA E TECNICA RICCA E DETTAGLIATA per il grafico del titolo {company} ({ticker}) su {market}.
+        user_prompt = f"""Esegui un'ANALISI GRAFICA E TECNICA COMPLETA SU CANDELSTICK E INDICATORI (Alligator, MACD, ADX, RSI, Volumi) per il grafico del titolo {company} ({ticker}) su {market}.
 Prezzo corrente di chiusura: {last_close}
 
 Testo grezzo dal grafico/Gemini Web:
@@ -273,16 +277,20 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura esatta:
     "market": "{market}",
     "current_market_price": {last_close},
     "analysis_type": "CHART_VISION",
-    "timestamp_utc": "2026-08-09T19:10:00Z"
+    "timestamp_utc": "2026-08-09T20:10:00Z"
   }},
   "chart_vision_analysis": {{
     "trend_direction": "[Rialzista / Ribassista / In Consolidamento]",
-    "chart_pattern": "[Doppio Minimo di inversione / Canale Rialzista / Triangolo di Consolidamento / Accumulazione]",
+    "chart_pattern": "[Doppio Minimo di inversione / Canale Rialzista / Triangolo / Testa e Spalle / Accumulazione]",
+    "candlestick_analysis": "[Analisi dei pattern di candele giapponesi recenti: Doji, Engulfing, Hammer, Marubozu, ombre e struttura del corpo candela]",
+    "alligator_ma_analysis": "[Analisi dettagliata delle 3 linee Williams Alligator (Jaw 13, Teeth 8, Lips 5) e inclinazione medie mobili EMA30/EMA50]",
+    "macd_adx_analysis": "[Analisi dell'incrocio MACD/Signal, direzione dell'istogramma e valore ADX (sopra o sotto 25) con incrocio DI+ e DI-]",
+    "volume_oscillator_analysis": "[Analisi dei volumi di scambio sulle candele di espansione e livelli degli oscillatori RSI e Stocastico]",
     "breakout_trigger": "[Prezzo esatto del Trigger di Breakout con valuta es. 123.80 GBp o 2.35 €]",
     "structural_support": "[Prezzo esatto Supporto Principale S1 con valuta es. 96.92 GBp o 2.13 €]",
     "secondary_support": "[Prezzo esatto Supporto Breve S2 con valuta es. 113.79 GBp o 2.26 €]",
     "structural_resistance": "[Prezzo esatto Resistenza Massima R1 con valuta es. 131.10 GBp o 2.42 €]",
-    "vision_summary_explanation": "[Descrizione visiva approfondita del grafico in almeno 4 frasi dettagliate su price action, inclinazione delle medie, Alligator e stato di RSI e MACD]",
+    "vision_summary_explanation": "[Descrizione visiva globale del grafico in almeno 4 frasi dettagliate su price action, inclinazione delle medie, Alligator e stato di RSI e MACD]",
     "operational_note": "[Nota operativa prudente e dettagliata per la gestione della posizione, compreso il livello di ingresso al trigger e lo stop loss consigliato sotto il supporto]"
   }},
   "technical_levels": {{
