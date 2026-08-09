@@ -222,17 +222,18 @@ def parse_with_openai_agent(raw_gemini_text, ticker, company, market, is_chart=F
         safe_print("Nota: OPENAI_API_KEY non trovata in .env. Restituisco risposta grezza.")
         return raw_gemini_text
 
-    safe_print("🤖 OpenAI Agent: Formattazione strutturata del testo estratto da Gemini Web...")
+    safe_print(f"🤖 OpenAI Agent: Formattazione strutturata {'ANALISI GRAFICO VISION' if is_chart else 'RICERCA NEWS & MARKET'} da Gemini Web...")
 
-    system_prompt = "Sei l'Agente AI di Analisi Finanziaria. Converti le notizie e informazioni estratte da Gemini Web in un blocco JSON rigoroso ed accurato."
+    system_prompt = "Sei l'Agente AI di Analisi Finanziaria. Converti le informazioni estratte da Gemini Web in un blocco JSON rigoroso ed accurato."
 
-    user_prompt = f"""Estrai e formatta i dati seguenti estratti da Gemini Web per il titolo {company} ({ticker}) su {market}.
+    if is_chart:
+        user_prompt = f"""Analizza i dati tecnici e grafici estratti da Gemini Web per il grafico del titolo {company} ({ticker}) su {market}.
 Prezzo corrente di mercato: {last_close}
 
 Testo grezzo da Gemini Web:
 {raw_gemini_text}
 
-Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura esatta:
+Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura di ANALISI GRAFICO VISION:
 ```json
 {{
   "search_metadata": {{
@@ -241,6 +242,42 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura esatta:
     "ticker": "{ticker}",
     "market": "{market}",
     "current_market_price": {last_close},
+    "analysis_type": "CHART_VISION",
+    "timestamp_utc": "2026-08-09T18:50:00Z"
+  }},
+  "chart_vision_analysis": {{
+    "trend_direction": "[Rialzista / Ribassista / Laterale]",
+    "chart_pattern": "[Canale Rialzista / Doppio Minimo / Triangolo / Testa e Spalle / Consolidamento]",
+    "breakout_trigger": "[Livello prezzo trigger per entrare es. 2.356 €]",
+    "structural_support": "[Livello supporto principale S1 es. 2.317 €]",
+    "secondary_support": "[Livello supporto S2 es. 2.297 €]",
+    "structural_resistance": "[Livello resistenza R1 es. 2.356 €]",
+    "vision_summary_explanation": "[Spiegazione visiva approfondita della struttura del grafico e del trend in almeno 3 frasi]"
+  }},
+  "technical_levels": {{
+    "supports": ["[S1 con valuta]", "[S2 con valuta]"],
+    "resistances": ["[R1 con valuta]", "[R2 con valuta]"],
+    "critical_levels_notes": "[Note sintetiche sui livelli di supporto e breakout trigger]"
+  }}
+}}
+```"""
+    else:
+        user_prompt = f"""Estrai e formatta le notizie e stime analisti da Gemini Web per il titolo {company} ({ticker}) su {market}.
+Prezzo corrente di mercato: {last_close}
+
+Testo grezzo da Gemini Web:
+{raw_gemini_text}
+
+Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura di RICERCA NEWS & MARKET:
+```json
+{{
+  "search_metadata": {{
+    "query_input": "{ticker}",
+    "company_name": "{company}",
+    "ticker": "{ticker}",
+    "market": "{market}",
+    "current_market_price": {last_close},
+    "analysis_type": "NEWS_RESEARCH",
     "timestamp_utc": "2026-08-09T18:50:00Z"
   }},
   "market_sentiment_summary": {{
@@ -310,11 +347,11 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura esatta:
         return raw_gemini_text
 
 def run_gemini_web_report(context, ticker, company, market, is_chart=False):
-    safe_print(f"\n=== Scansione Gemini Web (Playwright) per {company} ({ticker}) ===")
+    safe_print(f"\n=== Scansione Gemini Web (Playwright) [{ 'ANALISI GRAFICO VISION' if is_chart else 'RICERCA NEWS' }] per {company} ({ticker}) ===")
     page = open_gemini_page(context)
 
     if is_chart:
-        prompt = f"Analizza il titolo {company} ({ticker}) su {market}. Cerca e mostra supporto principale, resistenza/trigger e trend tecnico."
+        prompt = f"Analizza la struttura del GRAFICO TECNICO del titolo {company} ({ticker}) su {market}. Identifica il trend attuale, i livelli chiave di supporto S1 e S2, la resistenza R1 e il punto di breakout trigger."
     else:
         prompt = f"Cerca news di oggi e degli ultimi 3 giorni, rating degli analisti e target price per {company} ({ticker}) quotato su {market}."
 
