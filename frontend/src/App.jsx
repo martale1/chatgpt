@@ -1511,17 +1511,6 @@ export default function App() {
                                         </div>
                                       </div>
                                     ))}
-                                    {(cta.key_scenario || cta.vision_summary_explanation) && (
-                                      <div style={{ gridColumn: '1 / -1', background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #cbd5e1', boxShadow: '0 2px 5px rgba(0,0,0,0.03)' }}>
-                                        <strong style={{ color: '#15803d', fontSize: '0.92rem' }}>🎯 Scenario Principale Grafico AI:</strong>
-                                        <div style={{ marginTop: '6px', color: '#0f172a', lineHeight: 1.55, fontSize: '0.88rem' }}>{cta.key_scenario || cta.vision_summary_explanation}</div>
-                                      </div>
-                                    )}
-                                    {(cta.operational_note || cta.critical_levels_notes) && (
-                                      <div style={{ gridColumn: '1 / -1', fontStyle: 'italic', color: '#334155', background: '#eff6ff', padding: '0.65rem 0.9rem', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
-                                        💡 <strong style={{ color: '#1d4ed8' }}>Nota Operativa Prudente:</strong> {cta.operational_note || cta.critical_levels_notes}
-                                      </div>
-                                    )}
                                   </div>
 
                                   {/* CHATGPT VISION DETAILS CARD */}
@@ -1548,14 +1537,13 @@ export default function App() {
                                         <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', borderLeft: '4px solid #16a34a', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                                           <strong style={{ color: '#16a34a' }}>🟢 Supporti Grafici (Vision S1, S2):</strong>
                                           <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
-                                            {(cta.chart_supports || [cta.structural_support, cta.secondary_support])
+                                            {Array.from(new Set((cta.chart_supports || [cta.structural_support, cta.secondary_support])
                                               .filter(Boolean)
                                               .map(v => String(v).replace(/12047\.50/g, '123.80'))
                                               .filter(v => {
                                                 const n = parseFloat(String(v).replace(/[^0-9.]/g, ''));
                                                 return isNaN(n) || n < 5000;
-                                              })
-                                              .join(', ') || supportPrice}
+                                              }))).join(', ') || supportPrice}
                                           </div>
                                         </div>
                                         <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', borderLeft: '4px solid #dc2626', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
