@@ -222,18 +222,23 @@ def parse_with_openai_agent(raw_gemini_text, ticker, company, market, is_chart=F
         safe_print("Nota: OPENAI_API_KEY non trovata in .env. Restituisco risposta grezza.")
         return raw_gemini_text
 
-    safe_print(f"🤖 OpenAI Agent: Formattazione strutturata {'ANALISI GRAFICO VISION' if is_chart else 'RICERCA NEWS & MARKET'} da Gemini Web...")
+    safe_print(f"🤖 OpenAI Agent: Formattazione approfondita {'ANALISI GRAFICO VISION' if is_chart else 'RICERCA NEWS & MARKET'} da Gemini Web...")
 
-    system_prompt = "Sei l'Agente AI di Analisi Finanziaria. Converti le informazioni estratte da Gemini Web in un blocco JSON rigoroso ed accurato."
+    system_prompt = (
+        "Sei un analista tecnico senior dei mercati finanziari. "
+        "Per l'analisi del grafico, devi fornire una descrizione ricca, dettagliata ed approfondita della price action, del trend, "
+        "degli indicatori (Alligator, MACD, RSI, Parabolic SAR) e formulare una NOTA OPERATIVA PRUDENTE ed azionabile per i trader. "
+        "REGOLA TASSATIVA: NON INCLUDERE NOTIZIE SOCIETARIE O DATI FONDAMENTALI NELL'ANALISI DEL GRAFICO."
+    )
 
     if is_chart:
-        user_prompt = f"""Analizza i dati tecnici e grafici estratti da Gemini Web per il grafico del titolo {company} ({ticker}) su {market}.
-Prezzo corrente di mercato: {last_close}
+        user_prompt = f"""Esegui un'ANALISI GRAFICA E TECNICA RICCA E DETTAGLIATA per il grafico del titolo {company} ({ticker}) su {market}.
+Prezzo corrente di chiusura: {last_close}
 
-Testo grezzo da Gemini Web:
+Testo grezzo dal grafico/Gemini Web:
 {raw_gemini_text}
 
-Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura di ANALISI GRAFICO VISION:
+Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura esatta:
 ```json
 {{
   "search_metadata": {{
@@ -243,21 +248,22 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura di ANALISI GRAFI
     "market": "{market}",
     "current_market_price": {last_close},
     "analysis_type": "CHART_VISION",
-    "timestamp_utc": "2026-08-09T18:50:00Z"
+    "timestamp_utc": "2026-08-09T19:10:00Z"
   }},
   "chart_vision_analysis": {{
-    "trend_direction": "[Rialzista / Ribassista / Laterale]",
-    "chart_pattern": "[Canale Rialzista / Doppio Minimo / Triangolo / Testa e Spalle / Consolidamento]",
-    "breakout_trigger": "[Livello prezzo trigger per entrare es. 2.356 €]",
-    "structural_support": "[Livello supporto principale S1 es. 2.317 €]",
-    "secondary_support": "[Livello supporto S2 es. 2.297 €]",
-    "structural_resistance": "[Livello resistenza R1 es. 2.356 €]",
-    "vision_summary_explanation": "[Spiegazione visiva approfondita della struttura del grafico e del trend in almeno 3 frasi]"
+    "trend_direction": "[Rialzista / Ribassista / In Consolidamento]",
+    "chart_pattern": "[Doppio Minimo di inversione / Canale Rialzista / Triangolo di Consolidamento / Accumulazione]",
+    "breakout_trigger": "[Prezzo esatto del Trigger di Breakout con valuta es. 123.80 GBp o 2.35 €]",
+    "structural_support": "[Prezzo esatto Supporto Principale S1 con valuta es. 96.92 GBp o 2.13 €]",
+    "secondary_support": "[Prezzo esatto Supporto Breve S2 con valuta es. 113.79 GBp o 2.26 €]",
+    "structural_resistance": "[Prezzo esatto Resistenza Massima R1 con valuta es. 131.10 GBp o 2.42 €]",
+    "vision_summary_explanation": "[Descrizione visiva approfondita del grafico in almeno 4 frasi dettagliate su price action, inclinazione delle medie, Alligator e stato di RSI e MACD]",
+    "operational_note": "[Nota operativa prudente e dettagliata per la gestione della posizione, compreso il livello di ingresso al trigger e lo stop loss consigliato sotto il supporto]"
   }},
   "technical_levels": {{
     "supports": ["[S1 con valuta]", "[S2 con valuta]"],
     "resistances": ["[R1 con valuta]", "[R2 con valuta]"],
-    "critical_levels_notes": "[Note sintetiche sui livelli di supporto e breakout trigger]"
+    "critical_levels_notes": "[Nota sintetica su trigger di ingresso e supporto chiave]"
   }}
 }}
 ```"""
