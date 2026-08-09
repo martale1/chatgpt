@@ -1346,8 +1346,21 @@ export default function App() {
 
                             {/* IDENTIFIED LEVELS STATUS BAR & TOP REAL-TIME INSPECTION CARDS */}
                             {(() => {
-                              const chartData = realTickerData[query + '_CHART'] || realTickerData[row.ticker + '_CHART'];
-                              const cta = chartData?.chart_technical_analysis;
+                              const chartData = realTickerData[query + '_CHART'] || realTickerData[row.ticker + '_CHART'] || data;
+                              const ctaRaw = chartData?.chart_technical_analysis || chartData?.chart_vision_analysis || chartData?.technical_analysis;
+                              const cta = ctaRaw || (chartData?.technical_levels ? {
+                                key_scenario: chartData.technical_levels.critical_levels_notes || `Analisi del prezzo e dei volumi di scambio per ${row.company} (${row.ticker}).`,
+                                operational_note: chartData.technical_levels.critical_levels_notes || "Valutare l'ingresso al superamento confermato del trigger di breakout mantenendo uno stop loss sotto il supporto principale.",
+                                overall_trend: chartData.market_sentiment_summary?.expected_impact || "Analizzato",
+                                chart_supports: chartData.technical_levels.supports,
+                                chart_resistances: chartData.technical_levels.resistances
+                              } : {
+                                key_scenario: `Struttura del grafico tecnico di ${row.company} (${row.ticker}).`,
+                                operational_note: "Monitorare la tenuta del supporto principale e la reazione al livello di breakout trigger.",
+                                overall_trend: "Analizzato",
+                                chart_supports: [],
+                                chart_resistances: []
+                              });
                               const baseUrl = `http://localhost:3001/finance_charts/${row.ticker}_`;
                               const ver = `?v=${chartVersion}`;
 
@@ -1511,6 +1524,17 @@ export default function App() {
                                         </div>
                                       </div>
                                     ))}
+                                    {(cta.key_scenario || cta.vision_summary_explanation) && (
+                                      <div style={{ gridColumn: '1 / -1', background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #cbd5e1', boxShadow: '0 2px 5px rgba(0,0,0,0.03)' }}>
+                                        <strong style={{ color: '#15803d', fontSize: '0.92rem' }}>🎯 Scenario Principale Grafico AI:</strong>
+                                        <div style={{ marginTop: '6px', color: '#0f172a', lineHeight: 1.55, fontSize: '0.88rem' }}>{cta.key_scenario || cta.vision_summary_explanation}</div>
+                                      </div>
+                                    )}
+                                    {(cta.operational_note || cta.critical_levels_notes) && (
+                                      <div style={{ gridColumn: '1 / -1', fontStyle: 'italic', color: '#334155', background: '#eff6ff', padding: '0.65rem 0.9rem', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+                                        💡 <strong style={{ color: '#1d4ed8' }}>Nota Operativa Prudente:</strong> {cta.operational_note || cta.critical_levels_notes}
+                                      </div>
+                                    )}
                                   </div>
 
                                   {/* CHATGPT VISION DETAILS CARD */}
@@ -1523,12 +1547,6 @@ export default function App() {
                                         </span>
                                       </div>
                                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.9rem', fontSize: '0.84rem', color: '#334155' }}>
-                                        {cta.key_scenario && (
-                                          <div style={{ gridColumn: '1 / -1', background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #cbd5e1', boxShadow: '0 2px 5px rgba(0,0,0,0.03)' }}>
-                                            <strong style={{ color: '#15803d', fontSize: '0.92rem' }}>🎯 Scenario Principale Grafico AI:</strong>
-                                            <div style={{ marginTop: '6px', color: '#0f172a', lineHeight: 1.55, fontSize: '0.88rem' }}>{cta.key_scenario}</div>
-                                          </div>
-                                        )}
                                         {cta.operational_note && (
                                           <div style={{ gridColumn: '1 / -1', fontStyle: 'italic', color: '#334155', background: '#eff6ff', padding: '0.65rem 0.9rem', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
                                             💡 <strong style={{ color: '#1d4ed8' }}>Nota Operativa Prudente:</strong> {cta.operational_note}
