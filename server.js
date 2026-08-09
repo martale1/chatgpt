@@ -64,14 +64,14 @@ function parseReport(text, ticker, company) {
   }
 
   if (!jsonStr) {
-    throw new Error('Nessun blocco JSON trovato nella risposta di ChatGPT. Risposta ricevuta:\n' + text.slice(0, 500));
+    throw new Error('Nessun blocco JSON trovato nella risposta dell\'AI Agent. Risposta ricevuta:\n' + text.slice(0, 500));
   }
 
   let parsed;
   try {
     parsed = JSON.parse(jsonStr);
   } catch (e) {
-    throw new Error('JSON non valido nella risposta di ChatGPT: ' + e.message + '\n\nContenuto:\n' + jsonStr.slice(0, 500));
+    throw new Error('JSON non valido nella risposta dell\'AI Agent: ' + e.message + '\n\nContenuto:\n' + jsonStr.slice(0, 500));
   }
 
   // Always strictly override metadata with authoritative info
