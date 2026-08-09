@@ -1383,21 +1383,8 @@ export default function App() {
 
                             {/* IDENTIFIED LEVELS STATUS BAR & TOP REAL-TIME INSPECTION CARDS */}
                             {(() => {
-                              const chartData = realTickerData[query + '_CHART'] || realTickerData[row.ticker + '_CHART'] || data;
-                              const ctaRaw = chartData?.chart_technical_analysis || chartData?.chart_vision_analysis || chartData?.technical_analysis;
-                              const cta = ctaRaw || (chartData?.technical_levels ? {
-                                key_scenario: chartData.technical_levels.critical_levels_notes || `Analisi del prezzo e dei volumi di scambio per ${row.company} (${row.ticker}).`,
-                                operational_note: chartData.technical_levels.critical_levels_notes || "Valutare l'ingresso al superamento confermato del trigger di breakout mantenendo uno stop loss sotto il supporto principale.",
-                                overall_trend: chartData.market_sentiment_summary?.expected_impact || "Analizzato",
-                                chart_supports: chartData.technical_levels.supports,
-                                chart_resistances: chartData.technical_levels.resistances
-                              } : {
-                                key_scenario: `Struttura del grafico tecnico di ${row.company} (${row.ticker}).`,
-                                operational_note: "Monitorare la tenuta del supporto principale e la reazione al livello di breakout trigger.",
-                                overall_trend: "Analizzato",
-                                chart_supports: [],
-                                chart_resistances: []
-                              });
+                              const chartData = realTickerData[query + '_CHART'] || realTickerData[row.ticker + '_CHART'];
+                              const cta = chartData?.chart_technical_analysis || chartData?.chart_vision_analysis || chartData?.technical_analysis;
                               const baseUrl = `http://localhost:3001/finance_charts/${row.ticker}_`;
                               const ver = `?v=${chartVersion}`;
 
@@ -1575,29 +1562,48 @@ export default function App() {
                                   </div>
 
                                   {/* CHATGPT VISION DETAILS CARD */}
-                                  {cta && (
+                                  {cta ? (
                                     <div style={{ marginTop: '1.2rem', padding: '1rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                                       <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
                                         <span>🤖 Analisi Visuale Grafico AI (Playwright Vision)</span>
                                         <span style={{ fontSize: '0.78rem', background: '#e0e7ff', color: '#3730a3', padding: '3px 10px', borderRadius: '12px', fontWeight: 700 }}>
-                                          Trend Rilevato: {cta.overall_trend || 'Analizzato'}
+                                          Trend Rilevato: {cta.overall_trend || cta.trend_direction || 'Analizzato'}
                                         </span>
                                       </div>
                                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.9rem', fontSize: '0.84rem', color: '#334155' }}>
-                                        {cta.operational_note && (
+                                        {(cta.key_scenario || cta.vision_summary_explanation) && (
+                                          <div style={{ gridColumn: '1 / -1', background: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #cbd5e1', boxShadow: '0 2px 5px rgba(0,0,0,0.03)' }}>
+                                            <strong style={{ color: '#15803d', fontSize: '0.92rem' }}>🎯 Scenario Principale Grafico AI:</strong>
+                                            <div style={{ marginTop: '6px', color: '#0f172a', lineHeight: 1.55, fontSize: '0.88rem' }}>{cta.key_scenario || cta.vision_summary_explanation}</div>
+                                          </div>
+                                        )}
+                                        {(cta.operational_note || cta.critical_levels_notes) && (
                                           <div style={{ gridColumn: '1 / -1', fontStyle: 'italic', color: '#334155', background: '#eff6ff', padding: '0.65rem 0.9rem', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
-                                            💡 <strong style={{ color: '#1d4ed8' }}>Nota Operativa Prudente:</strong> {cta.operational_note}
+                                            💡 <strong style={{ color: '#1d4ed8' }}>Nota Operativa Prudente:</strong> {cta.operational_note || cta.critical_levels_notes}
                                           </div>
                                         )}
                                         <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', borderLeft: '4px solid #16a34a', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                                           <strong style={{ color: '#16a34a' }}>🟢 Supporti Grafici (Vision S1, S2):</strong>
-                                          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>{(cta.chart_supports || []).join(', ') || supportPrice}</div>
+                                          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>{(cta.chart_supports || [cta.structural_support, cta.secondary_support]).filter(Boolean).join(', ') || supportPrice}</div>
                                         </div>
                                         <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', borderLeft: '4px solid #dc2626', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                                           <strong style={{ color: '#dc2626' }}>🔴 Resistenze / Trigger (Vision R1, R2):</strong>
-                                          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>{(cta.chart_resistances || []).join(', ') || triggerPrice}</div>
+                                          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>{(cta.chart_resistances || [cta.breakout_trigger, cta.structural_resistance]).filter(Boolean).join(', ') || triggerPrice}</div>
                                         </div>
                                       </div>
+                                    </div>
+                                  ) : (
+                                    <div style={{ marginTop: '1.2rem', padding: '1rem 1.2rem', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.8rem' }}>
+                                      <div style={{ fontSize: '0.86rem', color: '#475569' }}>
+                                        📊 <strong style={{ color: '#0f172a' }}>Analisi Visuale del Grafico non ancora generata</strong> — Clicca sul pulsante a destra per inviare l'immagine del grafico all'IA.
+                                      </div>
+                                      <button
+                                        onClick={() => runChartAgentAnalysis(row.ticker)}
+                                        disabled={loading}
+                                        style={{ background: '#a855f7', border: 'none', color: '#ffffff', padding: '0.4rem 0.85rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                                      >
+                                        📊 Analizza Grafico AI
+                                      </button>
                                     </div>
                                   )}
                                 </>
