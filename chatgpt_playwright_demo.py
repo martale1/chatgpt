@@ -342,6 +342,20 @@ def wait_for_response(page, initial_assistant_count=0, timeout_seconds=RESPONSE_
         except PlaywrightError:
             continue
 
+        # Ignora i testi temporanei delle pillole di ricerca web (es. "Ricerca in 15 siti web")
+        is_search_pill = (
+            current_text.startswith("Ricerca in") or 
+            current_text.startswith("Searching") or 
+            "siti web" in current_text.lower() or 
+            "searching the web" in current_text.lower()
+        ) and "{" not in current_text and "```" not in current_text
+
+        if is_search_pill:
+            if elapsed_ms % 6000 == 0:
+                safe_print(f"🔍 ChatGPT sta effettuando ricerche sul web ('{current_text.splitlines()[0]}')... [{elapsed_ms // 1000}s]")
+            stable_reads = 0
+            continue
+
         if current_text and current_text == last_text:
             stable_reads += 1
         else:
@@ -349,7 +363,8 @@ def wait_for_response(page, initial_assistant_count=0, timeout_seconds=RESPONSE_
             last_text = current_text
             safe_print(f"Risposta in corso: {len(last_text)} caratteri ricevuti...")
 
-        if last_text and stable_reads >= 2:
+        # Attendi che il testo sia stabile e contenga l'inizio del blocco JSON o testo di analisi
+        if last_text and stable_reads >= 2 and ("{" in last_text or "```" in last_text or len(last_text) > 100):
             return last_text
 
     safe_print(f"Timeout risposta dopo {timeout_seconds}s.")
