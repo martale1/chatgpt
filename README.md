@@ -1,44 +1,54 @@
-# ⚡ Multi-Agent Financial News Analyzer (Playwright + ChatGPT + React)
+# ⚡ Multi-Agent Financial News & Vision Analyzer (Gemini Web + OpenAI Agent)
 
-Un'applicazione avanzata basata su un'architettura **Multi-Agent** per l'estrazione, la classificazione, l'analisi del sentiment e l'estrazione di dati tecnici di azioni/aziende finanziarie utilizzando **Playwright** per l'automazione su **ChatGPT** e una dashboard moderna in **React**.
+Un'applicazione avanzata basata su un'architettura **Multi-Agent** per l'estrazione, la classificazione, l'analisi del sentiment e l'estrazione di dati tecnici di azioni/aziende finanziarie.
 
 ---
 
-## 🏛️ Architettura di Sistema (Multi-Agent Architecture)
+## 🌿 Struttura Branch Git e Tecnologie per Modello
+
+- **Branch `gemini`** (Branch Attuale):
+  - **Scraper Web**: **Playwright** interagisce direttamente con **Google Gemini Web (`https://gemini.google.com/app`)** tramite browser Chrome.
+  - **AI Agent Parsing**: Utilizza l'**API di OpenAI (`gpt-4o-mini`)** per convertire la risposta grezza estrazione da Gemini Web in un JSON strutturato e rigoroso.
+  - **Script Principale**: `gemini_playwright_demo.py`
+  - **Funzionalità di Aggiornamento Flessibile**: Possibilità di aggiornare **Notizie & Sentiment (📰)**, **Analisi Grafico AI (📊)** oppure **Entrambi (⚡)**.
+
+- **Branch `feature/next-updates`**:
+  - **Scraper Web**: **Playwright** interagisce direttamente con **ChatGPT Web (`https://chatgpt.com/`)**.
+  - **Script Principale**: `chatgpt_playwright_demo.py`
+
+---
+
+## 🏛️ Architettura di Sistema (Branch Gemini)
 
 Il sistema adotta un modello multi-agente per separare nettamente l'orchestrazione delle richieste, l'interazione web con l'LLM, la sintassi e la validazione strutturata dei dati.
 
 ```mermaid
 flowchart TD
-    A[User / Frontend React] -->|Query: Ticker o Nome Azienda| B[Controller & Orchestrator Agent]
+    A[User / Frontend React] -->|Query: Ticker o Nome Azienda| B[Controller & Orchestrator Agent - server.js]
     B -->|1. Risoluzione Ticker & Formattazione Prompt| C[Prompt Engineering Agent]
-    C -->|2. Prompt strutturato JSON| D[Playwright Scraper Agent]
-    D -->|3. Chrome CDP Debug Port :9222| E[ChatGPT Web Interface]
-    E -->|4. Risposta Streaming Raw| D
-    D -->|5. Risposta Raw| F[JSON Sanitizer & Parser Agent]
-    F -->|6. Validazione Schema & Fallback| G[Validation & Enrichment Agent]
-    G -->|7. JSON Finale Normalizzato| B
-    B -->|8. Rendering Dati & Schede| A
+    C -->|2. Scansione Web via Playwright| D[Google Gemini Web Interface]
+    D -->|3. Estrazione Risposta Grezza| E[Playwright Scraper Agent]
+    E -->|4. Testo Grezzo Gemini| F[OpenAI Agent - gpt-4o-mini]
+    F -->|5. Parsing & Strutturazione JSON| G[Validation & Enrichment Agent]
+    G -->|6. JSON Finale Normalizzato| B
+    B -->|7. Rendering Dati & Schede UI| A
 ```
 
 ### Agenti del Sistema:
 
-1. **Controller & Orchestrator Agent**:
-   - Riceve l'input dall'utente (sia esso un Ticker es. `AVIO.MI`, `AAPL`, `VOD.L` oppure un Nome Azienda es. `Avio`, `Apple`, `Vodafone`).
-   - Gestisce la sequenza operativa dei singoli moduli e coordina i flussi di fallback.
+1. **Controller & Orchestrator Agent (`server.js`)**:
+   - Riceve l'input dall'utente dal Frontend React e coordina i moduli di ricerca Notizie e Analisi Grafico AI.
+   - Permette l'aggiornamento selettivo: **Solo Notizie (📰)**, **Solo Grafico (📊)** o **Entrambi (⚡)**.
 
-2. **Prompt Engineering Agent**:
-   - Costruisce ed arricchisce i prompt ottimizzati affinché ChatGPT restituisca una risposta deterministica e rigorosamente conforme allo schema **JSON**.
+2. **Playwright Scraper Agent (`gemini_playwright_demo.py`)**:
+   - Gestisce l'interazione con **Google Gemini Web (`https://gemini.google.com/app`)**.
+   - Rimuove automaticamente banner di consenso Cookie/Privacy (`dismiss_overlay_modals`) per evitare timeout di click e garantisce l'avvio in modalità visibile su Chrome.
 
-3. **Playwright Scraper Agent**:
-   - Gestisce l'interazione diretta con il browser tramite **Chrome Developer Protocol (CDP)** su porta `9222`.
-   - Inserisce i dati nel campo di testo di ChatGPT (`prompt-textarea`), invia i messaggi e rileva in tempo reale il completamento della risposta in streaming bypassando blocchi o verifiche interattive.
+3. **OpenAI Agent Parser (`gpt-4o-mini`)**:
+   - Riceve il testo grezzo da Gemini Web e lo converte in un blocco **JSON** rigoroso e conforme allo schema dell'applicazione.
 
-4. **JSON Sanitizer & Parser Agent**:
-   - Estrae ed elide eventuali marcatori di codice markdown (es. ` ```json `), pulisce caratteri di formattazione non validi e valida la sintassi del JSON generato dall'LLM.
-
-5. **Validation & Enrichment Agent**:
-   - Garantisce la presenza dei tre livelli di profondità temporale (*News degli ultimi 3 giorni*, *Ultime notizie storiche rilevanti disponibili*, *Supporti/Resistenze e Target Price*).
+4. **Validation & Enrichment Agent**:
+   - Sanitizza ed elide eventuali livelli anomali (spike > 5000), garantendo la separazione **100% pura** tra le Notizie e l'Analisi Visiva del Grafico.
 
 ---
 
@@ -49,57 +59,41 @@ Ogni analisi produce un oggetto JSON rigoroso con la seguente struttura:
 ```json
 {
   "search_metadata": {
-    "query_input": "AVIO.MI",
-    "company_name": "Avio S.p.A.",
-    "ticker": "AVIO.MI",
-    "market": "Borsa Italiana",
-    "timestamp_utc": "2026-08-04T21:00:00Z"
+    "query_input": "NVDA",
+    "company_name": "NVIDIA Corporation",
+    "ticker": "NVDA",
+    "market": "NASDAQ",
+    "analysis_type": "NEWS_RESEARCH",
+    "timestamp_utc": "2026-08-09T19:25:00Z"
   },
   "market_sentiment_summary": {
-    "overall_sentiment": "Positivo",
-    "sentiment_score": 0.8,
-    "expected_impact": "Rialzista di breve termine",
+    "overall_sentiment": "Molto Positiva",
+    "sentiment_score": 0.91,
+    "expected_impact": "Impatto atteso positivo sul titolo, con momentum favorevole.",
     "summary_explanation": "Sintesi breve sui driver principali che influenzano il titolo."
   },
   "recent_news_last_3_days": [
     {
       "id": "news_1",
-      "headline": "Titolo notizia recente negli ultimi 3 giorni (compreso oggi)",
-      "date": "2026-08-04",
-      "source": "Il Sole 24 Ore / Yahoo Finance",
-      "category": "Financials / Contratto",
+      "headline": "Titolo notizia recente negli ultimi 3 giorni",
+      "date": "2026-08-08",
+      "source": "Reuters / Yahoo Finance",
+      "category": "Financials",
       "summary": "Riassunto dettagliato...",
       "sentiment": "Positivo",
       "impact_rating": "Alto",
       "source_url": "https://..."
     }
   ],
-  "latest_available_news": [
-    {
-      "id": "news_2",
-      "headline": "Ultima notizia storica rilevante (se assenti novità nei 3 giorni)",
-      "date": "2026-07-20",
-      "source": "Milano Finanza",
-      "category": "M&A / Partnership",
-      "summary": "Riassunto dell'ultima notizia nota...",
-      "sentiment": "Positivo",
-      "impact_rating": "Medio",
-      "source_url": "https://..."
-    }
-  ],
-  "analyst_ratings_and_targets": [
-    {
-      "broker": "Equita SIM",
-      "rating": "Hold",
-      "target_price": 32.5,
-      "currency": "EUR",
-      "date": "2026-06-01"
-    }
-  ],
-  "technical_levels": {
-    "supports": ["€29.50", "€28.60"],
-    "resistances": ["€31.70", "€33.00"],
-    "critical_levels_notes": "Note sui livelli chiave e spartiacque di trend."
+  "chart_vision_analysis": {
+    "trend_direction": "Rialzista",
+    "chart_pattern": "Doppio Minimo di inversione",
+    "breakout_trigger": "224.76 €",
+    "structural_support": "189.80 €",
+    "secondary_support": "190.01 €",
+    "structural_resistance": "224.76 €",
+    "vision_summary_explanation": "Descrizione approfondita della price action, dell'inclinazione dell'Alligator e degli oscillatori.",
+    "operational_note": "Nota operativa prudente e dettagliata per la gestione della posizione."
   }
 }
 ```
@@ -110,13 +104,14 @@ Ogni analisi produce un oggetto JSON rigoroso con la seguente struttura:
 
 ```text
 chatgpt/
-├── chatgpt_playwright_demo.py   # Agent Python Playwright (collegamento via CDP su porta 9222)
-├── requirements.txt             # Dipendenze Python (playwright, telepot, pandas, requests)
-├── .env.example                 # File di esempio per credenziali e chiavi ambiente
+├── gemini_playwright_demo.py    # Agent Python Gemini Web + OpenAI Parsing Agent (Branch gemini)
+├── chatgpt_playwright_demo.py   # Agent Python ChatGPT Web (Branch feature/next-updates)
+├── server.js                    # Backend Node.js Orchestrator & API Server (porta 3001)
+├── requirements.txt             # Dipendenze Python (playwright, pandas, requests)
 ├── README.md                    # Documentazione di sistema e architettura
-└── frontend/                    # Application Dashboard React (Vite + React)
+└── frontend/                    # Dashboard UI React (Vite + React)
     ├── src/
-    │   ├── App.jsx              # Dashboard UI in React (Badge sentiment, schede news, JSON viewer)
+    │   ├── App.jsx              # Dashboard UI in React (Aggiornamenti Flessibili, Vision AI, Interactive Charts)
     │   ├── index.css            # Design system e stili Dark Mode
     │   └── main.jsx
     ├── package.json
@@ -131,37 +126,29 @@ chatgpt/
 - **Python 3.8+**
 - **Node.js 18+**
 - **Google Chrome**
+- **Chiave API OpenAI** (Configurata in `.env` come `OPENAI_API_KEY=sk-...`)
 
-### 2. Installazione Dipendenze Python
+### 2. Installazione Dipendenze Python e Node
 
 ```bash
 pip install -r requirements.txt
 python -m playwright install chromium
-```
 
-### 3. Avvio di Chrome con porta CDP Debug (:9222)
-
-Apri il prompt dei comandi (CMD) ed esegui:
-
-```cmd
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="%TEMP%\chatgpt-cdp-profile" https://chatgpt.com/
-```
-*(Effettua il login a ChatGPT nella finestra browser aperta se necessario)*.
-
-### 4. Esecuzione Agent Python (Playwright Test)
-
-```bash
-python chatgpt_playwright_demo.py --stocks AVIO.MI --no-telegram
-```
-
-### 5. Avvio della Dashboard React
-
-In una nuova finestra di terminale:
-
-```bash
 cd frontend
 npm install
+```
+
+### 3. Avvio Server Backend e Dashboard
+
+In un terminale:
+```bash
+node server.js
+```
+
+In un secondo terminale:
+```bash
+cd frontend
 npm run dev
 ```
 
-Apri `http://localhost:5173/` per utilizzare l'interfaccia di prova.
+Apri `http://localhost:5173/` per utilizzare l'applicazione. Potrai scegliere se aggiornare **Notizie (📰)**, **Grafico (📊)** oppure **Entrambi (⚡)**!

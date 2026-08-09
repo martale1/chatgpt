@@ -180,6 +180,7 @@ export default function App() {
   const [clickedBar, setClickedBar] = useState(null);
   const [chartVersion, setChartVersion] = useState(Date.now());
   const [showJsonOutput, setShowJsonOutput] = useState(false);
+  const [updateMenuOpenTicker, setUpdateMenuOpenTicker] = useState(null);
 
   // ── Scroll sempre in cima alla pagina quando si cambia tab o ticker ──────
   useEffect(() => {
@@ -1000,19 +1001,81 @@ export default function App() {
                     )}
                   </span>
                   <span className="wt-impact">{row.impact}</span>
-                  <span style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                    <button
-                      className={row.analyzed ? 'btn-secondary' : 'btn-primary'}
-                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
-                      disabled={loading}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveTab('dashboard');
-                        runAgentAnalysis(row.ticker);
-                      }}
-                    >
-                      {row.analyzed ? '🔄 Aggiorna' : '⚡ Analizza Live'}
-                    </button>
+                  <span style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', position: 'relative' }}>
+                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                      <button
+                        className={row.analyzed ? 'btn-secondary' : 'btn-primary'}
+                        style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700 }}
+                        disabled={loading}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setUpdateMenuOpenTicker(updateMenuOpenTicker === row.ticker ? null : row.ticker);
+                        }}
+                        title="Scegli cosa aggiornare: News, Grafico AI o Entrambi"
+                      >
+                        <span>{row.analyzed ? '🔄 Aggiorna' : '⚡ Analizza Live'}</span>
+                        <span style={{ fontSize: '0.65rem' }}>▼</span>
+                      </button>
+
+                      {updateMenuOpenTicker === row.ticker && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            right: 0,
+                            top: '100%',
+                            marginTop: '6px',
+                            background: '#0f172a',
+                            border: '1px solid #334155',
+                            borderRadius: '10px',
+                            boxShadow: '0 12px 30px rgba(0,0,0,0.6)',
+                            zIndex: 9999,
+                            minWidth: '220px',
+                            overflow: 'hidden'
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div
+                            style={{ padding: '0.65rem 0.85rem', fontSize: '0.78rem', color: '#f8fafc', borderBottom: '1px solid #1e293b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.45rem', background: '#0b1329', fontWeight: 600 }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#1e293b'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = '#0b1329'}
+                            onClick={() => {
+                              setUpdateMenuOpenTicker(null);
+                              setActiveTab('dashboard');
+                              runAgentAnalysis(row.ticker);
+                            }}
+                          >
+                            <span>📰</span> <strong>1. Aggiorna Notizie & Sentiment</strong>
+                          </div>
+                          <div
+                            style={{ padding: '0.65rem 0.85rem', fontSize: '0.78rem', color: '#f8fafc', borderBottom: '1px solid #1e293b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.45rem', background: '#0b1329', fontWeight: 600 }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#1e293b'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = '#0b1329'}
+                            onClick={() => {
+                              setUpdateMenuOpenTicker(null);
+                              setActiveTab('dashboard');
+                              runChartAgentAnalysis(row.ticker);
+                            }}
+                          >
+                            <span>📊</span> <strong>2. Aggiorna Analisi Grafico AI</strong>
+                          </div>
+                          <div
+                            style={{ padding: '0.65rem 0.85rem', fontSize: '0.78rem', color: '#38bdf8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.45rem', background: '#0284c720', fontWeight: 700 }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#0284c735'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = '#0284c720'}
+                            onClick={async () => {
+                              setUpdateMenuOpenTicker(null);
+                              setActiveTab('dashboard');
+                              setLoading(true);
+                              await runAgentAnalysis(row.ticker);
+                              await runChartAgentAnalysis(row.ticker);
+                              setLoading(false);
+                            }}
+                          >
+                            <span>⚡</span> <strong style={{ color: '#38bdf8' }}>3. Aggiorna Entrambi (News + Grafico)</strong>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                     <button
                       style={{
                         padding: '0.3rem 0.5rem',
@@ -1161,6 +1224,32 @@ export default function App() {
                               >
                                 📊 Analizza Grafico AI
                               </button>
+                               <button
+                                 onClick={async () => {
+                                   setLoading(true);
+                                   await runAgentAnalysis(data.search_metadata.ticker);
+                                   await runChartAgentAnalysis(data.search_metadata.ticker);
+                                   setLoading(false);
+                                 }}
+                                 disabled={loading}
+                                 style={{
+                                   marginLeft: '0.5rem',
+                                   background: 'rgba(34, 197, 94, 0.15)',
+                                   border: '1px solid rgba(34, 197, 94, 0.4)',
+                                   color: '#4ade80',
+                                   padding: '0.25rem 0.6rem',
+                                   borderRadius: '6px',
+                                   fontSize: '0.75rem',
+                                   cursor: 'pointer',
+                                   display: 'inline-flex',
+                                   alignItems: 'center',
+                                   gap: '0.25rem',
+                                   fontWeight: '700',
+                                 }}
+                                 title="Aggiorna sia le Notizie che l'Analisi Grafico AI nello stesso momento"
+                               >
+                                 ⚡ Aggiorna Entrambi
+                               </button>
 
                               {data.search_metadata.timestamp_utc && (
                                 <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#94a3b8', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
