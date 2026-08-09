@@ -166,6 +166,7 @@ export default function App() {
 
   const [newTickersInput, setNewTickersInput] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [aiEngine, setAiEngine] = useState('gemini'); // 'gemini' | 'chatgpt'
   const [logs, setLogs] = useState([]);
   const [sortOrder, setSortOrder] = useState('desc'); // default: score più alto prima ('desc')
   const [chartTimeframe, setChartTimeframe] = useState('3m');
@@ -313,7 +314,7 @@ export default function App() {
     };
 
     try {
-      const eventSource = new EventSource(`http://localhost:3001/api/analyze?ticker=${encodeURIComponent(target)}`);
+      const eventSource = new EventSource(`http://localhost:3001/api/analyze?ticker=${encodeURIComponent(target)}&engine=${aiEngine}`);
 
       let connectionTimeout = setTimeout(() => {
         eventSource.close();
@@ -395,7 +396,7 @@ export default function App() {
     };
 
     try {
-      const eventSource = new EventSource(`http://localhost:3001/api/analyze?ticker=${encodeURIComponent(target)}&type=chart`);
+      const eventSource = new EventSource(`http://localhost:3001/api/analyze?ticker=${encodeURIComponent(target)}&type=chart&engine=${aiEngine}`);
 
       let connectionTimeout = setTimeout(() => {
         eventSource.close();
@@ -462,7 +463,7 @@ export default function App() {
       }]);
 
       try {
-        const eventSource = new EventSource(`http://localhost:3001/api/analyze?ticker=${encodeURIComponent(target)}`);
+        const eventSource = new EventSource(`http://localhost:3001/api/analyze?ticker=${encodeURIComponent(target)}&engine=${aiEngine}`);
 
         let connectionTimeout = setTimeout(() => {
           eventSource.close();
@@ -731,6 +732,42 @@ export default function App() {
             onKeyDown={(e) => e.key === 'Enter' && handleSearch(query)}
             placeholder="Analizza Singolo Ticker (es. AVIO.MI, VOD.L, AAPL)..."
           />
+          <div style={{ display: 'flex', gap: '0.3rem', background: '#0f172a', border: '1px solid #334155', padding: '0.25rem', borderRadius: '8px', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', paddingLeft: '0.4rem', paddingRight: '0.2rem' }}>🤖 Motore AI:</span>
+            <button
+              onClick={() => setAiEngine('gemini')}
+              style={{
+                border: 'none',
+                background: aiEngine === 'gemini' ? '#2563eb' : 'transparent',
+                color: aiEngine === 'gemini' ? '#ffffff' : '#94a3b8',
+                padding: '0.35rem 0.75rem',
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              ✦ Google Gemini AI (1s)
+            </button>
+            <button
+              onClick={() => setAiEngine('chatgpt')}
+              style={{
+                border: 'none',
+                background: aiEngine === 'chatgpt' ? '#10b981' : 'transparent',
+                color: aiEngine === 'chatgpt' ? '#ffffff' : '#94a3b8',
+                padding: '0.35rem 0.75rem',
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              💬 ChatGPT Web (Playwright)
+            </button>
+          </div>
+
           <button className="btn-primary" onClick={() => runAgentAnalysis(query.trim().toUpperCase())} disabled={loading || !query.trim()}>
             {loading ? <span className="spinner">⏳ Analisi...</span> : '🔄 Avvia Analisi Live'}
           </button>

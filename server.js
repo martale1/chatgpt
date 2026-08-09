@@ -320,6 +320,7 @@ print(json.dumps({'bars': bars, 'metrics': metrics}))
     const res = meRes;
     const ticker = parsedUrl.query.ticker || 'VOD.L';
     const isChart = parsedUrl.query.type === 'chart' || parsedUrl.query.chart === 'true';
+    const engine = parsedUrl.query.engine || 'gemini';
     const info = getCompanyInfo(ticker);
 
     res.writeHead(200, {
@@ -329,7 +330,8 @@ print(json.dumps({'bars': bars, 'metrics': metrics}))
       'Access-Control-Allow-Origin': '*'
     });
     
-    res.write(`data: ${JSON.stringify({ type: 'log', agent: 'Controller & Orchestrator Agent', msg: `Avvio dello scraper Playwright (${isChart ? 'Analisi Grafico AI' : 'Analisi News'}) per il ticker: ${ticker}` })}\n\n`);
+    const scriptName = engine === 'chatgpt' ? 'chatgpt_playwright_demo.py' : 'gemini_agent.py';
+    res.write(`data: ${JSON.stringify({ type: 'log', agent: 'Controller & Orchestrator Agent', msg: `Avvio Agente ${engine === 'chatgpt' ? 'ChatGPT Playwright Web' : 'Google Gemini AI Engine'} per il ticker: ${ticker}` })}\n\n`);
 
     const period = parsedUrl.query.period || '1y';
     const days = parsedUrl.query.days || '252';
@@ -337,7 +339,7 @@ print(json.dumps({'bars': bars, 'metrics': metrics}))
 
     const args = [
       '-u',
-      path.join(__dirname, 'chatgpt_playwright_demo.py'),
+      path.join(__dirname, scriptName),
       '--ticker', ticker,
       '--company', info.company,
       '--market', info.market,
@@ -347,7 +349,7 @@ print(json.dumps({'bars': bars, 'metrics': metrics}))
       args.push('--analyze-chart');
     }
 
-    res.write(`data: ${JSON.stringify({ type: 'log', agent: 'Playwright Scraper Agent', msg: `Eseguo: python3 chatgpt_playwright_demo.py --ticker ${ticker} --company "${info.company}" --market "${info.market}" ${isChart ? '--analyze-chart' : ''}` })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'log', agent: engine === 'chatgpt' ? 'Playwright Scraper Agent' : 'Google Gemini Agent', msg: `Eseguo: python3 ${scriptName} --ticker ${ticker} --company "${info.company}" --market "${info.market}"` })}\n\n`);
 
     const scraperProcess = spawn(PYTHON_PATH, args, { shell: false });
 
