@@ -136,29 +136,21 @@ def send_gemini_prompt(page, prompt, image_path=None):
     initial_count = page.locator("message-content, div.model-response-text, .markdown").count()
 
     # Se è richiesta l'analisi visiva del grafico, allega l'immagine PNG del grafico a Gemini Web
-    if image_path:
-        if isinstance(image_path, list):
-            abs_paths = [os.path.abspath(p) for p in image_path if os.path.exists(p)]
-            safe_print(f"📷 Caricamento di {len(abs_paths)} immagini di analisi tecnica in Gemini Web: {abs_paths}")
-            try:
-                file_inputs = page.locator("input[type='file']")
-                if file_inputs.count() > 0:
-                    file_inputs.first.set_input_files(abs_paths)
-                    safe_print(f"✅ {len(abs_paths)} Immagini di analisi tecnica allegate a Gemini Web! Attendo anteprima (4s)...")
-                    page.wait_for_timeout(4000)
-            except Exception as e:
-                safe_print(f"⚠️ Caricamento immagini in Gemini Web: {e}")
-        else:
-            abs_path = os.path.abspath(image_path)
-            safe_print(f"📷 Caricamento immagine del grafico in Gemini Web: {abs_path}")
-            try:
-                file_inputs = page.locator("input[type='file']")
-                if file_inputs.count() > 0:
-                    file_inputs.first.set_input_files(abs_path)
-                    safe_print("✅ Immagine del grafico allegata a Gemini Web! Attendo anteprima (3s)...")
-                    page.wait_for_timeout(3000)
-            except Exception as e:
-                safe_print(f"⚠️ Caricamento immagine in Gemini Web: {e}")
+    if image_path and os.path.exists(str(image_path)):
+        abs_path = os.path.abspath(str(image_path))
+        safe_print(f"📷 Caricamento immagine del grafico in Gemini Web: {abs_path}")
+        try:
+            file_inputs = page.locator("input[type='file']")
+            if file_inputs.count() > 0:
+                file_inputs.first.set_input_files(abs_path)
+                file_inputs.first.dispatch_event("change")
+                file_inputs.first.dispatch_event("input")
+                safe_print("✅ Immagine del grafico allegata a Gemini Web!")
+        except Exception as e:
+            safe_print(f"⚠️ Caricamento immagine in Gemini Web: {e}")
+
+        safe_print("Attendo rendering dell'anteprima dell'immagine nel prompt (3s)...")
+        page.wait_for_timeout(3000)
 
     box = find_gemini_prompt_box(page)
     safe_print("Campo prompt Gemini Web trovato.")
@@ -474,12 +466,34 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura di RICERCA NEWS 
 }}
 ```"""
 
+    import base64
+    user_content = user_prompt
+    if is_chart:
+        master_path = Path("finance_charts") / f"{ticker.replace('/', '_')}_master_vision.png"
+        if master_path.exists():
+            try:
+                with open(master_path, "rb") as f_img:
+                    b64_str = base64.b64encode(f_img.read()).decode("utf-8")
+                user_content = [
+                    {"type": "text", "text": user_prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{b64_str}",
+                            "detail": "high"
+                        }
+                    }
+                ]
+                safe_print(f"👁️ Vision Mode OpenAI Agent attiva con grafico master in alta definizione ({master_path})!")
+            except Exception as e:
+                safe_print(f"⚠️ Impossibile convertire grafico in base64: {e}")
+
     url = "https://api.openai.com/v1/chat/completions"
     payload = {
-        "model": "gpt-4o-mini",
+        "model": "gpt-4o",
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
+            {"role": "user", "content": user_content}
         ],
         "response_format": {"type": "json_object"},
         "temperature": 0.2
