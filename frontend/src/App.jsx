@@ -6,8 +6,9 @@ const getSentimentColor = (score) => {
   if (score >= 0.85) return { bg: 'rgba(34,197,94,0.12)',  border: '#16a34a', text: '#4ade80',  label: 'Molto Positivo' };
   if (score >= 0.65) return { bg: 'rgba(34,197,94,0.07)',  border: '#22c55e', text: '#86efac',  label: 'Positivo' };
   if (score >= 0.45) return { bg: 'rgba(234,179,8,0.10)',  border: '#ca8a04', text: '#fbbf24',  label: 'Neutro' };
-  if (score >= 0.25) return { bg: 'rgba(249,115,22,0.10)', border: '#ea580c', text: '#fb923c',  label: 'Liev. Negativo' };
   return               { bg: 'rgba(239,68,68,0.10)',  border: '#dc2626', text: '#f87171',  label: 'Negativo' };
+};
+
 const getIndicatorCardStyle = (text, explicitSentiment) => {
   let sentiment = explicitSentiment;
   if (!sentiment && text) {
