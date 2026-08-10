@@ -205,7 +205,12 @@ def wait_for_gemini_response(page, initial_count=0, timeout_seconds=RESPONSE_TIM
 
     safe_print("Attendo la risposta di Google Gemini Web...")
     while elapsed_ms < deadline_ms:
-        page.wait_for_timeout(step_ms)
+        try:
+            page.wait_for_timeout(step_ms)
+        except Exception:
+            if last_text:
+                return last_text
+            break
         elapsed_ms += step_ms
 
         selectors = [
