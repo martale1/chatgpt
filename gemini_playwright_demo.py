@@ -4,6 +4,18 @@ import os
 import sys
 import urllib.request
 from pathlib import Path
+
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+if hasattr(sys.stderr, 'reconfigure'):
+    try:
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import sync_playwright
@@ -256,7 +268,7 @@ def parse_with_openai_agent(raw_gemini_text, ticker, company, market, is_chart=F
         "2. Williams Alligator (Jaw 13, Teeth 8, Lips 5) e allineamento medie mobili EMA30/EMA50. "
         "3. MACD (incrocio con Signal line, istogramma del momentum) e ADX con DI+ e DI- per la forza del trend. "
         "4. Volumi di scambio e oscillatori di ipercomprato/ipervenduto (RSI e Stocastico). "
-        "5. Formulare uno Scenario Principale ed una NOTA OPERATIVA PRUDENTE con trigger e stop-loss. "
+        "5. Formulare uno Scenario Principale ed una NOTA OPERATIVA PRUDENTE. NELLA NOTA OPERATIVA E' TASSATIVO ED OBBLIGATORIO INDICARE SEMPRE UN LIVELLO DI INGRESSO (Trigger) ED UN LIVELLO DI STOP LOSS CONSIGLIATO. "
         "REGOLA TASSATIVA: NON INCLUDERE NOTIZIE SOCIETARIE O DATI FONDAMENTALI NELL'ANALISI DEL GRAFICO."
     )
 
@@ -291,7 +303,7 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura esatta:
     "secondary_support": "[Prezzo esatto Supporto Breve S2 con valuta es. 113.79 GBp o 2.26 €]",
     "structural_resistance": "[Prezzo esatto Resistenza Massima R1 con valuta es. 131.10 GBp o 2.42 €]",
     "vision_summary_explanation": "[Descrizione visiva globale del grafico in almeno 4 frasi dettagliate su price action, inclinazione delle medie, Alligator e stato di RSI e MACD]",
-    "operational_note": "[Nota operativa prudente e dettagliata per la gestione della posizione, compreso il livello di ingresso al trigger e lo stop loss consigliato sotto il supporto]"
+    "operational_note": "[Nota operativa prudente e dettagliata per la gestione della posizione: E' OBBLIGATORIO specificare sia il livello esatto di ingresso al trigger sia il LIVELLO DI STOP LOSS consigliato sotto il supporto per limitare le perdite]"
   }},
   "technical_levels": {{
     "supports": ["[S1 con valuta]", "[S2 con valuta]"],
@@ -301,7 +313,7 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura esatta:
 }}
 ```"""
     else:
-        user_prompt = f"""Estrai e formatta le notizie e stime analisti da Gemini Web per il titolo {company} ({ticker}) su {market}.
+        user_prompt = f"""Estrai e formatta le notizie (SIA RECENTI DEGLI ULTIMI 3 GIORNI, SIA MENO RECENTI / STORICHE DEI MESI SCORSI) e le stime analisti da Gemini Web per il titolo {company} ({ticker}) su {market}.
 Prezzo corrente di mercato: {last_close}
 
 Testo grezzo da Gemini Web:
@@ -328,20 +340,34 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura di RICERCA NEWS 
   }},
   "recent_news_last_3_days": [
     {{
-      "id": "news_1",
-      "headline": "[Titolo notizia]",
+      "id": "news_rec_1",
+      "headline": "[Titolo notizia recente ultimi 3 giorni]",
       "date": "YYYY-MM-DD",
       "source": "[Fonte es. Il Sole 24 Ore / Reuters]",
       "source_domain": "ilsole24ore.com",
       "url": null,
       "category": "Corporate",
-      "summary": "[Sintesi]",
-      "detail": "[Testo completo e dettagliato senza abbreviazioni]",
+      "summary": "[Sintesi dettagliata]",
+      "detail": "[Testo completo della notizia recente]",
       "sentiment": "Positivo",
       "impact_rating": "Alto"
     }}
   ],
-  "latest_available_news": [],
+  "latest_available_news": [
+    {{
+      "id": "news_old_1",
+      "headline": "[Titolo notizia meno recente o storica importante dei mesi/settimane precedenti]",
+      "date": "YYYY-MM-DD",
+      "source": "[Fonte es. Milano Finanza / Ansa]",
+      "source_domain": "milanofinanza.it",
+      "url": null,
+      "category": "Market",
+      "summary": "[Sintesi della notizia meno recente]",
+      "detail": "[Testo completo e dettagliato della notizia meno recente]",
+      "sentiment": "Neutro",
+      "impact_rating": "Medio"
+    }}
+  ],
   "analyst_ratings_and_targets": [
     {{
       "broker": "[Banca/Broker]",
@@ -380,6 +406,8 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura di RICERCA NEWS 
         with urllib.request.urlopen(req, timeout=25) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             json_text = data["choices"][0]["message"]["content"]
+            # Sanitize corrupted unicode characters or missing euro symbols
+            json_text = json_text.replace('\ufffd', '€').replace('', '€')
             return json_text
     except Exception as e:
         safe_print(f"Errore OpenAI Agent formatting ({e}). Restituisco risposta grezza.")
@@ -388,11 +416,15 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura di RICERCA NEWS 
 def run_gemini_web_report(context, ticker, company, market, is_chart=False):
     safe_print(f"\n=== Scansione Gemini Web (Playwright) [{ 'ANALISI GRAFICO VISION' if is_chart else 'RICERCA NEWS' }] per {company} ({ticker}) ===")
     page = open_gemini_page(context)
+    try:
+        page.bring_to_front()
+    except Exception:
+        pass
 
     if is_chart:
         prompt = f"Analizza la struttura del GRAFICO TECNICO del titolo {company} ({ticker}) su {market}. Identifica il trend attuale, i livelli chiave di supporto S1 e S2, la resistenza R1 e il punto di breakout trigger."
     else:
-        prompt = f"Cerca news di oggi e degli ultimi 3 giorni, rating degli analisti e target price per {company} ({ticker}) quotato su {market}."
+        prompt = f"Cerca sia le news recentissime degli ultimi 3 giorni, sia le notizie storiche e rilevanti dei mesi scorsi, rating degli analisti e target price per {company} ({ticker}) quotato su {market}."
 
     initial_count = send_gemini_prompt(page, prompt)
     raw_response = wait_for_gemini_response(page, initial_count)
