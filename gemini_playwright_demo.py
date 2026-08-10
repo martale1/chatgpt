@@ -214,27 +214,52 @@ def send_gemini_prompt(page, prompt, image_path=None):
             box.focus()
 
     box.fill(prompt)
+    try:
+        box.evaluate("el => el.dispatchEvent(new Event('input', { bubbles: true }))")
+        box.evaluate("el => el.dispatchEvent(new Event('change', { bubbles: true }))")
+    except Exception:
+        pass
+
     page.wait_for_timeout(800)
     safe_print("Prompt inserito in Gemini Web, invio in corso...")
     
     send_selectors = [
         "button.send-button",
-        "button[aria-label*='Send']",
         "button[aria-label*='Invia']",
+        "button[aria-label*='Send']",
         "button[aria-label*='Submit']",
+        "button[aria-label*='invia']",
+        "button[aria-label*='send']",
+        "button:has(mat-icon[fonticon='send'])",
+        "button:has(mat-icon[fonticon='send_spark'])",
         "mat-icon[fonticon='send']"
     ]
+    
+    clicked = False
     for sel in send_selectors:
-        btn = page.locator(sel).last
-        try:
-            btn.wait_for(state="visible", timeout=2500)
-            if btn.is_enabled():
-                btn.click()
-                return initial_count
-        except Exception:
-            continue
+        btns = page.locator(sel)
+        if btns.count() > 0:
+            for i in range(btns.count()):
+                b = btns.nth(i)
+                try:
+                    if b.is_visible():
+                        b.click(force=True)
+                        clicked = True
+                        safe_print(f"✅ Pulsante Invia di Gemini Web cliccato ({sel})!")
+                        break
+                except Exception:
+                    continue
+        if clicked:
+            break
 
-    page.keyboard.press("Enter")
+    if not clicked:
+        safe_print("Invio via tasto Enter da tastiera...")
+        try:
+            box.focus()
+            page.keyboard.press("Enter")
+        except Exception:
+            pass
+
     return initial_count
 
 def wait_for_gemini_response(page, initial_count=0, timeout_seconds=RESPONSE_TIMEOUT_SECONDS):
