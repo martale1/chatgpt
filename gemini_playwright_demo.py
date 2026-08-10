@@ -275,14 +275,24 @@ def parse_with_openai_agent(raw_gemini_text, ticker, company, market, is_chart=F
     load_env_file()
     openai_key = os.getenv("OPENAI_API_KEY")
     
-    # Import Yahoo Finance per prezzo live di supporto
+    # Import Yahoo Finance per i livelli reali disegnati sul grafico
     import yfinance as yf
     try:
         tk = yf.Ticker(ticker)
-        hist = tk.history(period="5d")
-        last_close = round(float(hist["Close"].iloc[-1]), 2) if len(hist) > 0 else 0.0
+        hist = tk.history(period="3m")
+        if len(hist) > 0:
+            last_close = round(float(hist["Close"].iloc[-1]), 2)
+            min_p = round(float(hist["Low"].min()), 2)
+            max_p = round(float(hist["High"].max()), 2)
+            trig_p = round(float(hist["High"].tail(20).max()), 2)
+            sec_sup_p = round(float(hist["Low"].tail(20).min()), 2)
+            currency_sym = "GBp" if ".L" in ticker else ("$" if ticker in ["NVDA", "AAPL", "MSFT", "TSLA", "AMD.O"] else "€")
+        else:
+            last_close, min_p, max_p, trig_p, sec_sup_p = 0.0, 0.0, 0.0, 0.0, 0.0
+            currency_sym = "€"
     except Exception:
-        last_close = 0.0
+        last_close, min_p, max_p, trig_p, sec_sup_p = 0.0, 0.0, 0.0, 0.0, 0.0
+        currency_sym = "€"
 
     if not openai_key:
         safe_print("Nota: OPENAI_API_KEY non trovata in .env. Restituisco risposta grezza.")
@@ -297,13 +307,15 @@ def parse_with_openai_agent(raw_gemini_text, ticker, company, market, is_chart=F
         "2. Williams Alligator (Jaw 13, Teeth 8, Lips 5) e allineamento medie mobili EMA30/EMA50. ATTENZIONE: Se la Jaw (blu 13) è sopra la Teeth (rossa 8) e Lips (verde 5) e i prezzi scendono sotto le linee, la configurazione dell'Alligator è NETTAMENTE RIBASSISTA e NON rialzista! Rispetta fedelmente la reale direzione dei prezzi. "
         "3. MACD (incrocio con Signal line, istogramma del momentum) e ADX con DI+ e DI- per la forza del trend. "
         "4. Volumi di scambio e oscillatori di ipercomprato/ipervenduto (RSI e Stocastico). "
-        "5. Formulare uno Scenario Principale ed una NOTA OPERATIVA PRUDENTE. NELLA NOTA OPERATIVA E' TASSATIVO ED OBBLIGATORIO INDICARE SEMPRE UN LIVELLO DI INGRESSO (Trigger) ED UN LIVELLO DI STOP LOSS CONSIGLIATO. "
+        f"5. LIVELLI GRAFICI REALI: I livelli tracciati sul grafico sono -> SUPPORTO {min_p} {currency_sym}, TRIGGER {trig_p} {currency_sym}, RESISTENZA MAX {max_p} {currency_sym}. DEVI USARE TASSATIVAMENTE QUESTI VALORI ESATTI nei campi JSON e nella NOTA OPERATIVA! NON INVENTARE O MUTARE I NUMERI DEI LIVELLI GRAFICI.\n"
+        "6. Formulare uno Scenario Principale ed una NOTA OPERATIVA PRUDENTE con LIVELLO DI INGRESSO TRIGGER e LIVELLO DI STOP LOSS CONSIGLIATO. "
         "REGOLA TASSATIVA: NON INCLUDERE NOTIZIE SOCIETARIE O DATI FONDAMENTALI NELL'ANALISI DEL GRAFICO."
     )
 
     if is_chart:
         user_prompt = f"""Esegui un'ANALISI GRAFICA E TECNICA COMPLETA SU CANDELSTICK E INDICATORI (Alligator, MACD, ADX, RSI, Volumi) per il grafico del titolo {company} ({ticker}) su {market}.
-Prezzo corrente di chiusura: {last_close}
+Prezzo corrente di chiusura: {last_close} {currency_sym}
+Livelli reali del grafico: Supporto {min_p} {currency_sym}, Trigger {trig_p} {currency_sym}, Resistenza {max_p} {currency_sym}
 
 Testo grezzo dal grafico/Gemini Web:
 {raw_gemini_text}
@@ -327,17 +339,17 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura esatta:
     "alligator_ma_analysis": "[Analisi dettagliata delle 3 linee Williams Alligator (Jaw 13, Teeth 8, Lips 5) e inclinazione medie mobili EMA30/EMA50]",
     "macd_adx_analysis": "[Analisi dell'incrocio MACD/Signal, direzione dell'istogramma e valore ADX (sopra o sotto 25) con incrocio DI+ e DI-]",
     "volume_oscillator_analysis": "[Analisi dei volumi di scambio sulle candele di espansione e livelli degli oscillatori RSI e Stocastico]",
-    "breakout_trigger": "[Prezzo esatto del Trigger di Breakout con valuta es. 123.80 GBp o 2.35 €]",
-    "structural_support": "[Prezzo esatto Supporto Principale S1 con valuta es. 96.92 GBp o 2.13 €]",
-    "secondary_support": "[Prezzo esatto Supporto Breve S2 con valuta es. 113.79 GBp o 2.26 €]",
-    "structural_resistance": "[Prezzo esatto Resistenza Massima R1 con valuta es. 131.10 GBp o 2.42 €]",
+    "breakout_trigger": "{trig_p} {currency_sym}",
+    "structural_support": "{min_p} {currency_sym}",
+    "secondary_support": "{sec_sup_p} {currency_sym}",
+    "structural_resistance": "{max_p} {currency_sym}",
     "vision_summary_explanation": "[Descrizione visiva globale del grafico in almeno 4 frasi dettagliate su price action, inclinazione delle medie, Alligator e stato di RSI e MACD]",
-    "operational_note": "[Nota operativa prudente e dettagliata per la gestione della posizione: E' OBBLIGATORIO specificare sia il livello esatto di ingresso al trigger sia il LIVELLO DI STOP LOSS consigliato sotto il supporto per limitare le perdite]"
+    "operational_note": "[Nota operativa prudente e dettagliata: E' OBBLIGATORIO usare i livelli del grafico, specificando il punto di ingresso a {trig_p} {currency_sym} ed il LIVELLO DI STOP LOSS consigliato sotto il supporto a {min_p} {currency_sym}]"
   }},
   "technical_levels": {{
-    "supports": ["[S1 con valuta]", "[S2 con valuta]"],
-    "resistances": ["[R1 con valuta]", "[R2 con valuta]"],
-    "critical_levels_notes": "[Nota sintetica su trigger di ingresso e supporto chiave]"
+    "supports": ["{min_p} {currency_sym}", "{sec_sup_p} {currency_sym}"],
+    "resistances": ["{trig_p} {currency_sym}", "{max_p} {currency_sym}"],
+    "critical_levels_notes": "Trigger di ingresso a {trig_p} {currency_sym} con supporto chiave a {min_p} {currency_sym}."
   }}
 }}
 ```"""
