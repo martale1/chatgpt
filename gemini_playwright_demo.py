@@ -251,6 +251,14 @@ def wait_for_gemini_response(page, initial_count=0, timeout_seconds=RESPONSE_TIM
     safe_print(f"Timeout risposta Gemini dopo {timeout_seconds}s.")
     return last_text
 
+def force_foreground_window():
+    import subprocess
+    try:
+        cmd = '''powershell -Command "$ws = New-Object -ComObject WScript.Shell; $ws.AppActivate('Google Chrome'); $ws.AppActivate('Gemini'); $ws.AppActivate('Chrome')"'''
+        subprocess.Popen(cmd, shell=True)
+    except Exception:
+        pass
+
 def open_gemini_page(context):
     page = None
     try:
@@ -270,7 +278,12 @@ def open_gemini_page(context):
 
     if "gemini.google.com" not in page.url:
         page.goto(GEMINI_URL, wait_until="domcontentloaded")
-    page.bring_to_front()
+    
+    try:
+        page.bring_to_front()
+        force_foreground_window()
+    except Exception:
+        pass
     return page
 
 def parse_with_openai_agent(raw_gemini_text, ticker, company, market, is_chart=False):
