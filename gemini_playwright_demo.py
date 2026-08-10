@@ -126,9 +126,38 @@ def dismiss_overlay_modals(page):
     except Exception:
         pass
 
-def send_gemini_prompt(page, prompt):
+def send_gemini_prompt(page, prompt, image_path=None):
     dismiss_overlay_modals(page)
+    try:
+        page.bring_to_front()
+    except Exception:
+        pass
+
     initial_count = page.locator("message-content, div.model-response-text, .markdown").count()
+
+    # Se è richiesta l'analisi visiva del grafico, allega l'immagine PNG del grafico a Gemini Web
+    if image_path and os.path.exists(image_path):
+        abs_path = os.path.abspath(image_path)
+        safe_print(f"📷 Caricamento immagine del grafico in Gemini Web: {abs_path}")
+        try:
+            file_inputs = page.locator("input[type='file']")
+            if file_inputs.count() > 0:
+                file_inputs.first.set_input_files(abs_path)
+                safe_print("✅ Immagine del grafico allegata a Gemini Web! Attendo anteprima (3s)...")
+                page.wait_for_timeout(3000)
+            else:
+                upload_btn = page.locator("button[aria-label*='Carica'], button[aria-label*='Upload'], button[aria-label*='Aggiungi'], button:has-text('+')").first
+                if upload_btn.count() > 0:
+                    upload_btn.click(force=True)
+                    page.wait_for_timeout(1000)
+                    file_inputs = page.locator("input[type='file']")
+                    if file_inputs.count() > 0:
+                        file_inputs.first.set_input_files(abs_path)
+                        safe_print("✅ Immagine del grafico allegata a Gemini Web! Attendo anteprima (3s)...")
+                        page.wait_for_timeout(3000)
+        except Exception as e:
+            safe_print(f"⚠️ Caricamento immagine in Gemini Web: {e}")
+
     box = find_gemini_prompt_box(page)
     safe_print("Campo prompt Gemini Web trovato.")
     
@@ -142,7 +171,7 @@ def send_gemini_prompt(page, prompt):
             box.focus()
 
     box.fill(prompt)
-    page.wait_for_timeout(500)
+    page.wait_for_timeout(800)
     safe_print("Prompt inserito in Gemini Web, invio in corso...")
     
     send_selectors = [
@@ -263,9 +292,9 @@ def parse_with_openai_agent(raw_gemini_text, ticker, company, market, is_chart=F
 
     system_prompt = (
         "Sei un analista tecnico ed esperto di analisi quantitativa e candlestick pattern dei mercati finanziari. "
-        "Per l'analisi del grafico, devi analizzare visivamente in modo rigoroso e completo: "
+        "Per l'analisi del grafico, devi analizzare visivamente l'immagine in modo rigoroso e veritiero: "
         "1. Pattern di candele giapponesi (Doji, Engulfing, Hammer, Marubozu, Harami, ombre superiori/inferiori e figure tecniche come Doppio Minimo/Massimo, Testa e Spalle, Flag). "
-        "2. Williams Alligator (Jaw 13, Teeth 8, Lips 5) e allineamento medie mobili EMA30/EMA50. "
+        "2. Williams Alligator (Jaw 13, Teeth 8, Lips 5) e allineamento medie mobili EMA30/EMA50. ATTENZIONE: Se la Jaw (blu 13) è sopra la Teeth (rossa 8) e Lips (verde 5) e i prezzi scendono sotto le linee, la configurazione dell'Alligator è NETTAMENTE RIBASSISTA e NON rialzista! Rispetta fedelmente la reale direzione dei prezzi. "
         "3. MACD (incrocio con Signal line, istogramma del momentum) e ADX con DI+ e DI- per la forza del trend. "
         "4. Volumi di scambio e oscillatori di ipercomprato/ipervenduto (RSI e Stocastico). "
         "5. Formulare uno Scenario Principale ed una NOTA OPERATIVA PRUDENTE. NELLA NOTA OPERATIVA E' TASSATIVO ED OBBLIGATORIO INDICARE SEMPRE UN LIVELLO DI INGRESSO (Trigger) ED UN LIVELLO DI STOP LOSS CONSIGLIATO. "
@@ -407,7 +436,7 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura di RICERCA NEWS 
             data = json.loads(resp.read().decode("utf-8"))
             json_text = data["choices"][0]["message"]["content"]
             # Sanitize corrupted unicode characters or missing euro symbols
-            json_text = json_text.replace('\ufffd', '€').replace('', '€')
+            json_text = json_text.replace('\ufffd', '€')
             return json_text
     except Exception as e:
         safe_print(f"Errore OpenAI Agent formatting ({e}). Restituisco risposta grezza.")
@@ -421,12 +450,29 @@ def run_gemini_web_report(context, ticker, company, market, is_chart=False):
     except Exception:
         pass
 
+    chart_image_path = None
     if is_chart:
-        prompt = f"Analizza la struttura del GRAFICO TECNICO del titolo {company} ({ticker}) su {market}. Identifica il trend attuale, i livelli chiave di supporto S1 e S2, la resistenza R1 e il punto di breakout trigger."
+        chart_dir = Path("finance_charts")
+        chart_dir.mkdir(exist_ok=True)
+        try:
+            from finance_charts.technical_charts import create_chart_bundle
+            create_chart_bundle(ticker, str(chart_dir), period="1y", days=65)
+            chart_img = chart_dir / f"{ticker}_price_alligator.png"
+            if chart_img.exists():
+                chart_image_path = str(chart_img)
+                safe_print(f"📊 Grafico PNG generato per la Scansione Vision: {chart_image_path}")
+        except Exception as e:
+            safe_print(f"⚠️ Impossibile generare grafico PNG: {e}")
+
+        prompt = (
+            f"Analizza attentamente l'IMMAGINE DEL GRAFICO TECNICO del titolo {company} ({ticker}) su {market} allegata.\n"
+            f"Fornisci un'analisi visuale accurata del trend effettivo del prezzo, dei livelli di supporto S1 e S2, della resistenza R1 e del punto di breakout trigger.\n"
+            f"ATTENZIONE RIGOROSA ALL'ALLIGATOR ED ALLE MEDIE: Osserva la vera direzione visuale. Se la Jaw blu (13) è in alto, la Teeth rossa (8) è in mezzo, la Lips verde (5) è in basso e il prezzo scende sotto di esse, il trend è RIBASSISTA / DISCENDENTE. Descrivi fedelmente ciò che vedi nell'immagine!"
+        )
     else:
         prompt = f"Cerca sia le news recentissime degli ultimi 3 giorni, sia le notizie storiche e rilevanti dei mesi scorsi, rating degli analisti e target price per {company} ({ticker}) quotato su {market}."
 
-    initial_count = send_gemini_prompt(page, prompt)
+    initial_count = send_gemini_prompt(page, prompt, image_path=chart_image_path)
     raw_response = wait_for_gemini_response(page, initial_count)
     
     # ── OPENAI AGENT PARSING ──
