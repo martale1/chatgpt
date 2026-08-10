@@ -219,18 +219,12 @@ export default function App() {
     fetch('http://localhost:3001/api/all-data')
       .then(res => res.json())
       .then(resData => {
-        if (resData?.tickerData && Object.keys(resData.tickerData).length > 0) {
+          // Conserva i dati ricevuti dal backend senza forzare l'apertura automatica di alcuna scheda
           setRealTickerData(prev => {
             const merged = { ...prev, ...resData.tickerData };
             localStorage.setItem('real_ticker_data', JSON.stringify(merged));
             return merged;
           });
-          const keys = Object.keys(resData.tickerData);
-          if (keys.length > 0 && !query) {
-            setQuery(keys[0]);
-            setData(resData.tickerData[keys[0]]);
-          }
-        }
         if (resData?.watchlists && typeof resData.watchlists === 'object' && Object.keys(resData.watchlists).length > 0) {
           setWatchlists(resData.watchlists);
         }
