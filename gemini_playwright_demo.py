@@ -466,34 +466,12 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura di RICERCA NEWS 
 }}
 ```"""
 
-    import base64
-    user_content = user_prompt
-    if is_chart:
-        master_path = Path("finance_charts") / f"{ticker.replace('/', '_')}_master_vision.png"
-        if master_path.exists():
-            try:
-                with open(master_path, "rb") as f_img:
-                    b64_str = base64.b64encode(f_img.read()).decode("utf-8")
-                user_content = [
-                    {"type": "text", "text": user_prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/png;base64,{b64_str}",
-                            "detail": "high"
-                        }
-                    }
-                ]
-                safe_print(f"👁️ Vision Mode OpenAI Agent attiva con grafico master in alta definizione ({master_path})!")
-            except Exception as e:
-                safe_print(f"⚠️ Impossibile convertire grafico in base64: {e}")
-
     url = "https://api.openai.com/v1/chat/completions"
     payload = {
-        "model": "gpt-4o",
+        "model": "gpt-4o-mini",
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_content}
+            {"role": "user", "content": user_prompt}
         ],
         "response_format": {"type": "json_object"},
         "temperature": 0.2
@@ -505,7 +483,7 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura di RICERCA NEWS 
             headers={"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"},
             data=json.dumps(payload).encode("utf-8")
         )
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             json_text = data["choices"][0]["message"].get("content") or ""
             if json_text:
