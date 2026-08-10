@@ -323,12 +323,7 @@ def wait_for_gemini_response(page, initial_count=0, timeout_seconds=RESPONSE_TIM
     return last_text
 
 def force_foreground_window():
-    import subprocess
-    try:
-        cmd = '''powershell -Command "$ws = New-Object -ComObject WScript.Shell; $ws.AppActivate('Google Chrome'); $ws.AppActivate('Gemini'); $ws.AppActivate('Chrome')"'''
-        subprocess.Popen(cmd, shell=True)
-    except Exception:
-        pass
+    pass
 
 def open_gemini_page(context):
     page = None
@@ -338,23 +333,20 @@ def open_gemini_page(context):
             try:
                 if "gemini.google.com" in p.url:
                     page = p
-                    page.bring_to_front()
                     break
             except Exception:
                 continue
         if page is None:
-            page = context.new_page()
+            if pages and len(pages) > 0:
+                page = pages[0]
+            else:
+                page = context.new_page()
     except Exception:
         page = context.new_page()
 
     if "gemini.google.com" not in page.url:
         page.goto(GEMINI_URL, wait_until="domcontentloaded")
     
-    try:
-        page.bring_to_front()
-        force_foreground_window()
-    except Exception:
-        pass
     return page
 
 def parse_with_openai_agent(raw_gemini_text, ticker, company, market, is_chart=False):
@@ -580,10 +572,6 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura di RICERCA NEWS 
 def run_gemini_web_report(context, ticker, company, market, is_chart=False):
     safe_print(f"\n=== Scansione Gemini Web (Playwright) [{ 'ANALISI GRAFICO VISION' if is_chart else 'RICERCA NEWS' }] per {company} ({ticker}) ===")
     page = open_gemini_page(context)
-    try:
-        page.bring_to_front()
-    except Exception:
-        pass
 
     chart_image_path = None
     if is_chart:
