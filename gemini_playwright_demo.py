@@ -522,15 +522,14 @@ def run_gemini_web_report(context, ticker, company, market, is_chart=False):
         try:
             from finance_charts.technical_charts import create_chart_bundle
             create_chart_bundle(ticker, str(chart_dir), period="1y", days=65)
-            for chart_name in [f"{ticker}_price_alligator.png", f"{ticker}_macd.png", f"{ticker}_oscillators.png", f"{ticker}_adx.png", f"{ticker}_volume.png"]:
-                c_p = chart_dir / chart_name
-                if c_p.exists():
-                    chart_images.append(str(c_p))
-            safe_print(f"📊 {len(chart_images)} Grafici PNG generati per la Scansione Vision (Prezzo, MACD, Oscillatori, ADX, Volumi)")
+            master_img_path = chart_dir / f"{ticker}_master_vision.png"
+            if master_img_path.exists():
+                chart_image_path = str(master_img_path)
+                safe_print(f"📊 Dashboard Grafica Unificata PNG generata e pronta per Gemini Web Vision: {chart_image_path}")
+            elif chart_images:
+                chart_image_path = chart_images[0]
         except Exception as e:
             safe_print(f"⚠️ Impossibile generare grafici PNG: {e}")
-
-        chart_image_path = chart_images if chart_images else None
 
         prompt = (
             f"Analizza attentamente l'IMMAGINE DEL GRAFICO TECNICO del titolo {company} ({ticker}) su {market} allegata.\n"

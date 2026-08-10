@@ -480,6 +480,44 @@ def latest_snapshot(df):
     }
 
 
+def combine_charts_to_master(ticker, output_dir):
+    from PIL import Image
+    output_dir = Path(output_dir)
+    safe_ticker = ticker.replace("/", "_")
+    image_names = [
+        f"{safe_ticker}_price_alligator.png",
+        f"{safe_ticker}_macd.png",
+        f"{safe_ticker}_oscillators.png",
+        f"{safe_ticker}_adx.png",
+        f"{safe_ticker}_volume.png"
+    ]
+    images = []
+    for name in image_names:
+        img_path = output_dir / name
+        if img_path.exists():
+            try:
+                images.append(Image.open(img_path))
+            except Exception:
+                pass
+            
+    if not images:
+        return None
+
+    widths, heights = zip(*(i.size for i in images))
+    max_width = max(widths)
+    total_height = sum(heights)
+
+    master_img = Image.new('RGB', (max_width, total_height), (255, 255, 255))
+    y_offset = 0
+    for img in images:
+        master_img.paste(img, (0, y_offset))
+        y_offset += img.height
+
+    master_path = output_dir / f"{safe_ticker}_master_vision.png"
+    master_img.save(master_path, quality=95)
+    return str(master_path)
+
+
 def create_chart_bundle(ticker, output_dir, period="1y", days=252, chart_type="candlestick"):
     output_dir = Path(output_dir)
     df = add_indicators(download_history(ticker, period=period))
@@ -492,4 +530,7 @@ def create_chart_bundle(ticker, output_dir, period="1y", days=252, chart_type="c
         plot_adx_dashboard(df, ticker, output_dir / f"{safe_ticker}_adx.png", days),
         plot_momentum_dashboard(df, ticker, output_dir / f"{safe_ticker}_momentum.png", days),
     ]
+    master_file = combine_charts_to_master(ticker, output_dir)
+    if master_file:
+        files.append(master_file)
     return {"ticker": ticker, "files": files, "snapshot": latest_snapshot(df)}
