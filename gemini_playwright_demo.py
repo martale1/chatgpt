@@ -279,7 +279,7 @@ def parse_with_openai_agent(raw_gemini_text, ticker, company, market, is_chart=F
     import yfinance as yf
     try:
         tk = yf.Ticker(ticker)
-        hist = tk.history(period="3m")
+        hist = tk.history(period="3mo")
         if len(hist) > 0:
             last_close = round(float(hist["Close"].iloc[-1]), 2)
             min_p = round(float(hist["Low"].min()), 2)
