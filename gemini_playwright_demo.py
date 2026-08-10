@@ -139,18 +139,67 @@ def send_gemini_prompt(page, prompt, image_path=None):
     if image_path and os.path.exists(str(image_path)):
         abs_path = os.path.abspath(str(image_path))
         safe_print(f"📷 Caricamento immagine del grafico in Gemini Web: {abs_path}")
+        upload_success = False
+        
         try:
-            file_inputs = page.locator("input[type='file']")
-            if file_inputs.count() > 0:
-                file_inputs.first.set_input_files(abs_path)
-                file_inputs.first.dispatch_event("change")
-                file_inputs.first.dispatch_event("input")
-                safe_print("✅ Immagine del grafico allegata a Gemini Web!")
-        except Exception as e:
-            safe_print(f"⚠️ Caricamento immagine in Gemini Web: {e}")
+            plus_selectors = [
+                "button[aria-label*='Aggiungi']",
+                "button[aria-label*='Upload']",
+                "button[aria-label*='Carica']",
+                "button[aria-label*='Inserisci']",
+                "button[mattooltip*='file']",
+                "button[mattooltip*='Aggiungi']",
+                "button.uploader-button",
+                "mat-icon[fonticon='add_circle']",
+                "mat-icon[fonticon='add']"
+            ]
+            
+            plus_btn = None
+            for sel in plus_selectors:
+                loc = page.locator(sel)
+                if loc.count() > 0:
+                    plus_btn = loc.first
+                    break
+            
+            if plus_btn:
+                try:
+                    with page.expect_file_chooser(timeout=3000) as fc_info:
+                        plus_btn.click(force=True)
+                    file_chooser = fc_info.value
+                    file_chooser.set_files(abs_path)
+                    upload_success = True
+                    safe_print("✅ Immagine del grafico sottomessa via FileChooser su Gemini Web!")
+                except Exception as ex_fc:
+                    safe_print(f"ℹ️ Clic su '+' ({ex_fc}), verifico se si è aperto un menu popover...")
+                    menu_item = page.locator("button:has-text('Carica'), mat-option:has-text('Carica'), [role='menuitem']:has-text('Carica'), span:has-text('Carica file')").first
+                    if menu_item.count() > 0 and menu_item.is_visible():
+                        with page.expect_file_chooser(timeout=3000) as fc_info2:
+                            menu_item.click(force=True)
+                        file_chooser2 = fc_info2.value
+                        file_chooser2.set_files(abs_path)
+                        upload_success = True
+                        safe_print("✅ Immagine sottomessa tramite voce del menu 'Carica file'!")
+        except Exception as e_upload:
+            safe_print(f"ℹ️ Esito tentativi FileChooser GUI: {e_upload}")
 
-        safe_print("Attendo rendering dell'anteprima dell'immagine nel prompt (3s)...")
-        page.wait_for_timeout(3000)
+        if not upload_success:
+            try:
+                file_inputs = page.locator("input[type='file']")
+                if file_inputs.count() > 0:
+                    file_inputs.first.set_input_files(abs_path)
+                    file_inputs.first.evaluate("el => el.dispatchEvent(new Event('change', { bubbles: true }))")
+                    file_inputs.first.evaluate("el => el.dispatchEvent(new Event('input', { bubbles: true }))")
+                    safe_print("✅ Immagine allegata via input[type='file'] con eventi DOM!")
+            except Exception as e:
+                safe_print(f"⚠️ Fallback input[type='file']: {e}")
+
+        safe_print("Attendo che Gemini Web mostri l'anteprima del grafico allegato...")
+        for _ in range(10):
+            page.wait_for_timeout(500)
+            preview = page.locator("uploader-file-chip, .file-preview, .thumbnail, img[src*='blob:'], img[src*='data:'], .attachment-container")
+            if preview.count() > 0:
+                safe_print("✅ ANTEPRIMA DEL GRAFICO CONFERMATA NEL PROMPT DI GEMINI WEB!")
+                break
 
     box = find_gemini_prompt_box(page)
     safe_print("Campo prompt Gemini Web trovato.")
