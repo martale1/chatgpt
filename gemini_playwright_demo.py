@@ -494,6 +494,62 @@ def run_gemini_web_report(context, ticker, company, market, is_chart=False):
     safe_print(formatted_json)
     return formatted_json
 
+def find_chrome_executable():
+    candidate_paths = [
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe")
+    ]
+    for p in candidate_paths:
+        if os.path.exists(p):
+            return p
+    return None
+
+def ensure_visible_chrome(cdp_url=DEFAULT_CDP_URL):
+    import urllib.request
+    import time
+    import subprocess
+    
+    try:
+        urllib.request.urlopen(f"{cdp_url}/json/version", timeout=1.5)
+        safe_print("✅ Chrome CDP (porta 9222) è già in ascolto in primo piano sul desktop!")
+        return True
+    except Exception:
+        pass
+
+    chrome_exe = find_chrome_executable()
+    if not chrome_exe:
+        safe_print("⚠️ chrome.exe non trovato nei percorsi standard di Windows.")
+        return False
+
+    user_data_path = os.path.abspath(str(PROFILE_DIR))
+    safe_print(f"🚀 Avvio la finestra di Google Chrome in primo piano ({chrome_exe})...")
+    
+    cmd_list = [
+        "cmd.exe", "/c", "start", "",
+        chrome_exe,
+        "--remote-debugging-port=9222",
+        f"--user-data-dir={user_data_path}",
+        "--start-maximized",
+        GEMINI_URL
+    ]
+    try:
+        subprocess.Popen(cmd_list)
+    except Exception as e:
+        safe_print(f"⚠️ Errore avvio comando Chrome: {e}")
+        return False
+
+    safe_print("Attendo l'apertura della finestra di Chrome sullo schermo...")
+    for _ in range(16):
+        time.sleep(0.5)
+        try:
+            urllib.request.urlopen(f"{cdp_url}/json/version", timeout=1)
+            safe_print("✅ Finestra di Google Chrome aperta in primo piano sul tuo desktop!")
+            return True
+        except Exception:
+            continue
+    return False
+
 def main():
     load_env_file()
     parser = argparse.ArgumentParser(description="Agent Gemini Web via Playwright + OpenAI Parsing Agent.")
@@ -510,20 +566,21 @@ def main():
     company = info["company"]
     market = info["market"]
 
+    # Forzi l'apertura della finestra visibile di Chrome se non è già attiva
+    ensure_visible_chrome(args.cdp)
+
     with sync_playwright() as p:
-        use_cdp = False
         context = None
         if args.cdp:
             try:
                 safe_print(f"Connessione a Chrome via CDP ({args.cdp})...")
-                browser = p.chromium.connect_over_cdp(args.cdp, timeout=5000)
+                browser = p.chromium.connect_over_cdp(args.cdp, timeout=8000)
                 context = browser.contexts[0] if browser.contexts else browser.new_context()
-                use_cdp = True
-                safe_print("Connessione CDP stabilita!")
+                safe_print("Connessione CDP alla finestra visibile di Chrome stabilita con successo!")
             except Exception as e:
-                safe_print(f"CDP non disponibile ({e}). Avvio browser Chrome...")
+                safe_print(f"CDP non disponibile ({e}). Avvio fallback browser...")
 
-        if not use_cdp:
+        if not context:
             context = p.chromium.launch_persistent_context(
                 user_data_dir=str(PROFILE_DIR),
                 headless=False,
