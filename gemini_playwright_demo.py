@@ -136,6 +136,19 @@ def send_gemini_prompt(page, prompt, image_path=None):
     initial_count = page.locator("message-content, div.model-response-text, .markdown").count()
 
     # Se è richiesta l'analisi visiva del grafico, allega l'immagine PNG del grafico a Gemini Web
+    # Assicura sempre una sessione di chat pulita ed attiva prima di inserire un nuovo prompt
+    safe_print("Resetto Gemini Web per una nuova sessione pulita...")
+    try:
+        new_chat_btn = page.locator("a[href*='/app'], button[aria-label*='Nuova chat'], button[aria-label*='New chat']").first
+        if new_chat_btn.count() > 0 and new_chat_btn.is_visible():
+            new_chat_btn.click(force=True)
+            page.wait_for_timeout(1200)
+        else:
+            page.goto(GEMINI_URL, wait_until="domcontentloaded")
+            page.wait_for_timeout(1200)
+    except Exception as e_reset:
+        safe_print(f"ℹ️ Reset chat: {e_reset}")
+
     if image_path and os.path.exists(str(image_path)):
         abs_path = os.path.abspath(str(image_path))
         safe_print(f"📷 Caricamento immagine del grafico in Gemini Web: {abs_path}")
