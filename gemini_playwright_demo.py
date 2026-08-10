@@ -636,37 +636,61 @@ def main():
     market = info["market"]
 
     with sync_playwright() as p:
-        profile_path = str(get_clean_profile_dir())
         context = None
-        try:
-            safe_print("🚀 Avvio della finestra reale di Google Chrome su Windows Desktop...")
-            context = p.chromium.launch_persistent_context(
-                user_data_dir=profile_path,
-                headless=False,
-                args=[
-                    "--start-maximized",
-                    "--disable-blink-features=AutomationControlled",
-                    "--no-sandbox"
-                ],
-                viewport=None,
-                channel="chrome"
-            )
-            safe_print("✅ Finestra di Google Chrome aperta in primo piano sul tuo schermo!")
-        except Exception as e:
-            safe_print(f"⚠️ Avvio su profilo primario ({e}). Uso profilo di sessione dedicato...")
-            temp_profile = str(Path("gemini_chrome_profile_run"))
-            context = p.chromium.launch_persistent_context(
-                user_data_dir=temp_profile,
-                headless=False,
-                args=[
-                    "--start-maximized",
-                    "--disable-blink-features=AutomationControlled",
-                    "--no-sandbox"
-                ],
-                viewport=None,
-                channel="chrome"
-            )
-            safe_print("✅ Finestra di Google Chrome (Sessione Fallback) aperta in primo piano!")
+        # 1. Prova a connettersi ad una finestra Chrome aperta dall'utente (Porta 9222)
+        if args.cdp:
+            try:
+                safe_print(f"🔌 Tentativo connessione a Chrome visibile sulla porta {args.cdp}...")
+                browser = p.chromium.connect_over_cdp(args.cdp, timeout=2500)
+                context = browser.contexts[0] if browser.contexts else browser.new_context()
+                safe_print("✅ Connessione stabilita alla tua finestra visibile di Chrome!")
+            except Exception:
+                safe_print("ℹ️ Nessuna finestra Chrome manuale rilevata su porta 9222. Avvio automatico...")
+
+        # 2. Se non c'è una finestra manuale, apri Chrome visibile a tutto schermo
+        if not context:
+            ensure_visible_chrome(args.cdp)
+            for _ in range(6):
+                try:
+                    browser = p.chromium.connect_over_cdp(args.cdp, timeout=2000)
+                    context = browser.contexts[0] if browser.contexts else browser.new_context()
+                    safe_print("✅ Finestra di Chrome visibile avviata e collegata con successo!")
+                    break
+                except Exception:
+                    time.sleep(1)
+
+        # 3. Fallback Playwright visibile se CDP non risponde
+        if not context:
+            profile_path = str(get_clean_profile_dir())
+            try:
+                safe_print("🚀 Avvio della finestra reale di Google Chrome su Windows Desktop...")
+                context = p.chromium.launch_persistent_context(
+                    user_data_dir=profile_path,
+                    headless=False,
+                    args=[
+                        "--start-maximized",
+                        "--disable-blink-features=AutomationControlled",
+                        "--no-sandbox"
+                    ],
+                    viewport=None,
+                    channel="chrome"
+                )
+                safe_print("✅ Finestra di Google Chrome aperta in primo piano sul tuo schermo!")
+            except Exception as e:
+                safe_print(f"⚠️ Avvio su profilo primario ({e}). Uso profilo di sessione dedicato...")
+                temp_profile = str(Path("gemini_chrome_profile_run"))
+                context = p.chromium.launch_persistent_context(
+                    user_data_dir=temp_profile,
+                    headless=False,
+                    args=[
+                        "--start-maximized",
+                        "--disable-blink-features=AutomationControlled",
+                        "--no-sandbox"
+                    ],
+                    viewport=None,
+                    channel="chrome"
+                )
+                safe_print("✅ Finestra di Google Chrome (Sessione Fallback) aperta in primo piano!")
 
         run_gemini_web_report(context, ticker, company, market, args.analyze_chart)
 
