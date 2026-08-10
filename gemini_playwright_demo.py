@@ -136,27 +136,29 @@ def send_gemini_prompt(page, prompt, image_path=None):
     initial_count = page.locator("message-content, div.model-response-text, .markdown").count()
 
     # Se è richiesta l'analisi visiva del grafico, allega l'immagine PNG del grafico a Gemini Web
-    if image_path and os.path.exists(image_path):
-        abs_path = os.path.abspath(image_path)
-        safe_print(f"📷 Caricamento immagine del grafico in Gemini Web: {abs_path}")
-        try:
-            file_inputs = page.locator("input[type='file']")
-            if file_inputs.count() > 0:
-                file_inputs.first.set_input_files(abs_path)
-                safe_print("✅ Immagine del grafico allegata a Gemini Web! Attendo anteprima (3s)...")
-                page.wait_for_timeout(3000)
-            else:
-                upload_btn = page.locator("button[aria-label*='Carica'], button[aria-label*='Upload'], button[aria-label*='Aggiungi'], button:has-text('+')").first
-                if upload_btn.count() > 0:
-                    upload_btn.click(force=True)
-                    page.wait_for_timeout(1000)
-                    file_inputs = page.locator("input[type='file']")
-                    if file_inputs.count() > 0:
-                        file_inputs.first.set_input_files(abs_path)
-                        safe_print("✅ Immagine del grafico allegata a Gemini Web! Attendo anteprima (3s)...")
-                        page.wait_for_timeout(3000)
-        except Exception as e:
-            safe_print(f"⚠️ Caricamento immagine in Gemini Web: {e}")
+    if image_path:
+        if isinstance(image_path, list):
+            abs_paths = [os.path.abspath(p) for p in image_path if os.path.exists(p)]
+            safe_print(f"📷 Caricamento di {len(abs_paths)} immagini di analisi tecnica in Gemini Web: {abs_paths}")
+            try:
+                file_inputs = page.locator("input[type='file']")
+                if file_inputs.count() > 0:
+                    file_inputs.first.set_input_files(abs_paths)
+                    safe_print(f"✅ {len(abs_paths)} Immagini di analisi tecnica allegate a Gemini Web! Attendo anteprima (4s)...")
+                    page.wait_for_timeout(4000)
+            except Exception as e:
+                safe_print(f"⚠️ Caricamento immagini in Gemini Web: {e}")
+        else:
+            abs_path = os.path.abspath(image_path)
+            safe_print(f"📷 Caricamento immagine del grafico in Gemini Web: {abs_path}")
+            try:
+                file_inputs = page.locator("input[type='file']")
+                if file_inputs.count() > 0:
+                    file_inputs.first.set_input_files(abs_path)
+                    safe_print("✅ Immagine del grafico allegata a Gemini Web! Attendo anteprima (3s)...")
+                    page.wait_for_timeout(3000)
+            except Exception as e:
+                safe_print(f"⚠️ Caricamento immagine in Gemini Web: {e}")
 
     box = find_gemini_prompt_box(page)
     safe_print("Campo prompt Gemini Web trovato.")
@@ -294,6 +296,30 @@ def parse_with_openai_agent(raw_gemini_text, ticker, company, market, is_chart=F
         last_close, min_p, max_p, trig_p, sec_sup_p = 0.0, 0.0, 0.0, 0.0, 0.0
         currency_sym = "€"
 
+    # Calcolo esatto dei dati matematici per MACD, ADX e Oscillatori
+    macd_info = ""
+    try:
+        from finance_charts.technical_charts import download_history, macd, adx_di, rsi
+        df_math = download_history(ticker, period="6mo")
+        close_m = df_math["Close"]
+        m_line, s_line, h_line = macd(close_m)
+        adx_val, p_di, m_di = adx_di(df_math)
+        rsi_val = rsi(close_m)
+
+        last_m = round(float(m_line.dropna().iloc[-1]), 2)
+        last_s = round(float(s_line.dropna().iloc[-1]), 2)
+        last_h = round(float(h_line.dropna().iloc[-1]), 2)
+        last_rsi = round(float(rsi_val.dropna().iloc[-1]), 1)
+        
+        if last_m > last_s and last_h > 0:
+            macd_info = f"MACD REALE DALL'IMMAGINE: MACD ({last_m}) ha INCROCIATO AL RIALZO sopra la Signal Line ({last_s}) con ISTOGRAMMA POSITIVO VERDE (+{last_h}). E' un segnale RIALZISTA / POSITIVO sul MACD! NELL'ANALISI DEL MACD DEVI DICHIARARE CHE L'ISTOGRAMMA E' VERDE E CHE IL MACD HA INCROCIATO AL RIALZO SULLA PARTE DESTRA DEL GRAFICO."
+        elif last_m < last_s and last_h < 0:
+            macd_info = f"MACD REALE DALL'IMMAGINE: MACD ({last_m}) è SOTTO la Signal Line ({last_s}) con ISTOGRAMMA NEGATIVO ROSSO ({last_h}). Incrocio RIBASSISTA."
+        else:
+            macd_info = f"MACD REALE DALL'IMMAGINE: MACD ({last_m}), Signal ({last_s}), Istogramma ({last_h})."
+    except Exception as e:
+        macd_info = ""
+
     import datetime
     current_timestamp_iso = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -308,7 +334,7 @@ def parse_with_openai_agent(raw_gemini_text, ticker, company, market, is_chart=F
         "Per l'analisi del grafico, devi analizzare visivamente l'immagine in modo rigoroso e veritiero: "
         "1. Pattern di candele giapponesi (Doji, Engulfing, Hammer, Marubozu, Harami, ombre superiori/inferiori e figure tecniche come Doppio Minimo/Massimo, Testa e Spalle, Flag). "
         "2. Williams Alligator (Jaw 13, Teeth 8, Lips 5) e allineamento medie mobili EMA30/EMA50. ATTENZIONE: Se la Jaw (blu 13) è sopra la Teeth (rossa 8) e Lips (verde 5) e i prezzi scendono sotto le linee, la configurazione dell'Alligator è NETTAMENTE RIBASSISTA e NON rialzista! Rispetta fedelmente la reale direzione dei prezzi. "
-        "3. MACD (incrocio con Signal line, istogramma del momentum) e ADX con DI+ e DI- per la forza del trend. "
+        f"3. {macd_info}\n"
         "4. Volumi di scambio e oscillatori di ipercomprato/ipervenduto (RSI e Stocastico). "
         f"5. LIVELLI GRAFICI REALI: I livelli tracciati sul grafico sono -> SUPPORTO {min_p} {currency_sym}, TRIGGER {trig_p} {currency_sym}, RESISTENZA MAX {max_p} {currency_sym}. DEVI USARE TASSATIVAMENTE QUESTI VALORI ESATTI nei campi JSON e nella NOTA OPERATIVA! NON INVENTARE O MUTARE I NUMERI DEI LIVELLI GRAFICI.\n"
         "6. Formulare uno Scenario Principale ed una NOTA OPERATIVA PRUDENTE con LIVELLO DI INGRESSO TRIGGER e LIVELLO DI STOP LOSS CONSIGLIATO. "
@@ -479,15 +505,19 @@ def run_gemini_web_report(context, ticker, company, market, is_chart=False):
     if is_chart:
         chart_dir = Path("finance_charts")
         chart_dir.mkdir(exist_ok=True)
+        chart_images = []
         try:
             from finance_charts.technical_charts import create_chart_bundle
             create_chart_bundle(ticker, str(chart_dir), period="1y", days=65)
-            chart_img = chart_dir / f"{ticker}_price_alligator.png"
-            if chart_img.exists():
-                chart_image_path = str(chart_img)
-                safe_print(f"📊 Grafico PNG generato per la Scansione Vision: {chart_image_path}")
+            for chart_name in [f"{ticker}_price_alligator.png", f"{ticker}_macd.png", f"{ticker}_oscillators.png", f"{ticker}_adx.png", f"{ticker}_volume.png"]:
+                c_p = chart_dir / chart_name
+                if c_p.exists():
+                    chart_images.append(str(c_p))
+            safe_print(f"📊 {len(chart_images)} Grafici PNG generati per la Scansione Vision (Prezzo, MACD, Oscillatori, ADX, Volumi)")
         except Exception as e:
-            safe_print(f"⚠️ Impossibile generare grafico PNG: {e}")
+            safe_print(f"⚠️ Impossibile generare grafici PNG: {e}")
+
+        chart_image_path = chart_images if chart_images else None
 
         prompt = (
             f"Analizza attentamente l'IMMAGINE DEL GRAFICO TECNICO del titolo {company} ({ticker}) su {market} allegata.\n"
