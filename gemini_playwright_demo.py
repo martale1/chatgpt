@@ -505,11 +505,11 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura di RICERCA NEWS 
             headers={"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"},
             data=json.dumps(payload).encode("utf-8")
         )
-        with urllib.request.urlopen(req, timeout=25) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-            json_text = data["choices"][0]["message"]["content"]
-            # Sanitize corrupted unicode characters or missing euro symbols
-            json_text = json_text.replace('\ufffd', '€')
+            json_text = data["choices"][0]["message"].get("content") or ""
+            if json_text:
+                json_text = json_text.replace('\ufffd', '€')
             
             # Garantisci che il timestamp_utc sia la data/ora esatta corrente di esecuzione
             try:
@@ -520,7 +520,7 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura di RICERCA NEWS 
             except Exception:
                 pass
                 
-            return json_text
+            return json_text if json_text else raw_gemini_text
     except Exception as e:
         safe_print(f"Errore OpenAI Agent formatting ({e}). Restituisco risposta grezza.")
         return raw_gemini_text
