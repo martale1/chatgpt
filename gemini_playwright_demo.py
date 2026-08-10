@@ -505,7 +505,7 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura di RICERCA NEWS 
             headers={"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"},
             data=json.dumps(payload).encode("utf-8")
         )
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=60) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             json_text = data["choices"][0]["message"].get("content") or ""
             if json_text:
