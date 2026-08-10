@@ -579,28 +579,48 @@ def main():
     company = info["company"]
     market = info["market"]
 
-    # Forzi l'apertura della finestra visibile di Chrome se non è già attiva
-    ensure_visible_chrome(args.cdp)
-
     with sync_playwright() as p:
         context = None
         if args.cdp:
             try:
                 safe_print(f"Connessione a Chrome via CDP ({args.cdp})...")
-                browser = p.chromium.connect_over_cdp(args.cdp, timeout=8000)
+                browser = p.chromium.connect_over_cdp(args.cdp, timeout=3000)
                 context = browser.contexts[0] if browser.contexts else browser.new_context()
-                safe_print("Connessione CDP alla finestra visibile di Chrome stabilita con successo!")
-            except Exception as e:
-                safe_print(f"CDP non disponibile ({e}). Avvio fallback browser...")
+                safe_print("Connessione CDP stabilita!")
+            except Exception:
+                pass
 
         if not context:
-            context = p.chromium.launch_persistent_context(
-                user_data_dir=str(PROFILE_DIR),
-                headless=False,
-                args=["--start-maximized", "--focus-on-new-tab"],
-                viewport=None,
-                channel="chrome"
-            )
+            ensure_visible_chrome(args.cdp)
+            for _ in range(8):
+                try:
+                    browser = p.chromium.connect_over_cdp(args.cdp, timeout=2000)
+                    context = browser.contexts[0] if browser.contexts else browser.new_context()
+                    safe_print("Connessione CDP alla finestra visibile di Chrome stabilita con successo!")
+                    break
+                except Exception:
+                    time.sleep(1)
+
+        if not context:
+            safe_print("CDP non disponibile. Avvio fallback browser Playwright...")
+            fallback_dir = PROFILE_DIR.parent / "gemini_chrome_profile_fallback"
+            try:
+                context = p.chromium.launch_persistent_context(
+                    user_data_dir=str(PROFILE_DIR),
+                    headless=False,
+                    args=["--start-maximized", "--focus-on-new-tab"],
+                    viewport=None,
+                    channel="chrome"
+                )
+            except Exception as e:
+                safe_print(f"Profilo primario occupato ({e}). Avvio su profilo dedicato fallback...")
+                context = p.chromium.launch_persistent_context(
+                    user_data_dir=str(fallback_dir),
+                    headless=False,
+                    args=["--start-maximized", "--focus-on-new-tab"],
+                    viewport=None,
+                    channel="chrome"
+                )
 
         run_gemini_web_report(context, ticker, company, market, args.analyze_chart)
 
