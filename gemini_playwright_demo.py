@@ -606,6 +606,19 @@ def ensure_visible_chrome(cdp_url=DEFAULT_CDP_URL):
             continue
     return False
 
+def get_clean_profile_dir():
+    profile_dir = Path("gemini_chrome_profile")
+    profile_dir.mkdir(exist_ok=True)
+    # Rimuove file di lock residui se Chrome era stato terminato in modo anomalo
+    for lock_name in ["SingletonLock", "SingletonSocket", "SingletonCookie"]:
+        try:
+            lock_file = profile_dir / lock_name
+            if lock_file.exists():
+                lock_file.unlink()
+        except Exception:
+            pass
+    return profile_dir
+
 def main():
     load_env_file()
     parser = argparse.ArgumentParser(description="Agent Gemini Web via Playwright + OpenAI Parsing Agent.")
@@ -623,47 +636,37 @@ def main():
     market = info["market"]
 
     with sync_playwright() as p:
+        profile_path = str(get_clean_profile_dir())
         context = None
-        if args.cdp:
-            try:
-                safe_print(f"Connessione a Chrome via CDP ({args.cdp})...")
-                browser = p.chromium.connect_over_cdp(args.cdp, timeout=3000)
-                context = browser.contexts[0] if browser.contexts else browser.new_context()
-                safe_print("Connessione CDP stabilita!")
-            except Exception:
-                pass
-
-        if not context:
-            ensure_visible_chrome(args.cdp)
-            for _ in range(8):
-                try:
-                    browser = p.chromium.connect_over_cdp(args.cdp, timeout=2000)
-                    context = browser.contexts[0] if browser.contexts else browser.new_context()
-                    safe_print("Connessione CDP alla finestra visibile di Chrome stabilita con successo!")
-                    break
-                except Exception:
-                    time.sleep(1)
-
-        if not context:
-            safe_print("CDP non disponibile. Avvio fallback browser Playwright...")
-            fallback_dir = PROFILE_DIR.parent / "gemini_chrome_profile_fallback"
-            try:
-                context = p.chromium.launch_persistent_context(
-                    user_data_dir=str(PROFILE_DIR),
-                    headless=False,
-                    args=["--start-maximized", "--focus-on-new-tab"],
-                    viewport=None,
-                    channel="chrome"
-                )
-            except Exception as e:
-                safe_print(f"Profilo primario occupato ({e}). Avvio su profilo dedicato fallback...")
-                context = p.chromium.launch_persistent_context(
-                    user_data_dir=str(fallback_dir),
-                    headless=False,
-                    args=["--start-maximized", "--focus-on-new-tab"],
-                    viewport=None,
-                    channel="chrome"
-                )
+        try:
+            safe_print("🚀 Avvio della finestra reale di Google Chrome su Windows Desktop...")
+            context = p.chromium.launch_persistent_context(
+                user_data_dir=profile_path,
+                headless=False,
+                args=[
+                    "--start-maximized",
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox"
+                ],
+                viewport=None,
+                channel="chrome"
+            )
+            safe_print("✅ Finestra di Google Chrome aperta in primo piano sul tuo schermo!")
+        except Exception as e:
+            safe_print(f"⚠️ Avvio su profilo primario ({e}). Uso profilo di sessione dedicato...")
+            temp_profile = str(Path("gemini_chrome_profile_run"))
+            context = p.chromium.launch_persistent_context(
+                user_data_dir=temp_profile,
+                headless=False,
+                args=[
+                    "--start-maximized",
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox"
+                ],
+                viewport=None,
+                channel="chrome"
+            )
+            safe_print("✅ Finestra di Google Chrome (Sessione Fallback) aperta in primo piano!")
 
         run_gemini_web_report(context, ticker, company, market, args.analyze_chart)
 
