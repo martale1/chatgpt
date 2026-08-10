@@ -527,7 +527,8 @@ def main():
             context = p.chromium.launch_persistent_context(
                 user_data_dir=str(PROFILE_DIR),
                 headless=False,
-                viewport={"width": 1400, "height": 900},
+                args=["--start-maximized", "--focus-on-new-tab"],
+                viewport=None,
                 channel="chrome"
             )
 
