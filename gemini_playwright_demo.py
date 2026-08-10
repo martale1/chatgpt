@@ -279,37 +279,21 @@ def wait_for_gemini_response(page, initial_count=0, timeout_seconds=RESPONSE_TIM
             break
         elapsed_ms += step_ms
 
-        selectors = [
-            "message-content",
-            "div.model-response-text",
-            "div.markdown",
-            ".response-container-content"
-        ]
-        messages = None
-        count = 0
-        for sel in selectors:
-            loc = page.locator(sel)
-            c = loc.count()
-            if c > 0:
-                messages = loc
-                count = c
-                break
-
-        if messages is None or count <= initial_count:
-            if elapsed_ms % 6000 == 0:
-                safe_print(f"🔍 Gemini Web sta elaborando la ricerca... [{elapsed_ms // 1000}s]")
-            continue
-
+        current_text = ""
         try:
-            current_text = messages.nth(count - 1).inner_text(timeout=5000).strip()
+            response_locs = page.locator("model-response, message-content, div.model-response-text, .response-container-content, div.markdown")
+            c = response_locs.count()
+            if c > 0:
+                current_text = response_locs.last.inner_text(timeout=3000).strip()
         except Exception:
+            pass
+
+        if not current_text or len(current_text) < 15:
+            if elapsed_ms % 6000 == 0:
+                safe_print(f"🔍 Gemini Web sta elaborando la risposta... [{elapsed_ms // 1000}s]")
             continue
 
-        # Ignora avvisi temporanei
-        if "generazione" in current_text.lower() and len(current_text) < 30:
-            continue
-
-        if current_text and current_text == last_text:
+        if current_text == last_text:
             stable_reads += 1
         else:
             stable_reads = 0
@@ -317,7 +301,10 @@ def wait_for_gemini_response(page, initial_count=0, timeout_seconds=RESPONSE_TIM
             safe_print(f"Risposta Gemini in corso: {len(last_text)} caratteri ricevuti...")
 
         if last_text and stable_reads >= 2 and len(last_text) > 40:
-            return last_text
+            stop_btn = page.locator("button[aria-label*='Stop'], button[aria-label*='Interrompi'], button:has(mat-icon[fonticon='stop'])")
+            if stop_btn.count() == 0 or not stop_btn.first.is_visible():
+                safe_print(f"✅ Risposta Gemini Web completata ({len(last_text)} caratteri)!")
+                return last_text
 
     safe_print(f"Timeout risposta Gemini dopo {timeout_seconds}s.")
     return last_text
