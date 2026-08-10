@@ -294,6 +294,9 @@ def parse_with_openai_agent(raw_gemini_text, ticker, company, market, is_chart=F
         last_close, min_p, max_p, trig_p, sec_sup_p = 0.0, 0.0, 0.0, 0.0, 0.0
         currency_sym = "€"
 
+    import datetime
+    current_timestamp_iso = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
     if not openai_key:
         safe_print("Nota: OPENAI_API_KEY non trovata in .env. Restituisco risposta grezza.")
         return raw_gemini_text
@@ -330,7 +333,7 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura esatta:
     "market": "{market}",
     "current_market_price": {last_close},
     "analysis_type": "CHART_VISION",
-    "timestamp_utc": "2026-08-09T20:10:00Z"
+    "timestamp_utc": "{current_timestamp_iso}"
   }},
   "chart_vision_analysis": {{
     "trend_direction": "[Rialzista / Ribassista / In Consolidamento]",
@@ -370,7 +373,7 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura di RICERCA NEWS 
     "market": "{market}",
     "current_market_price": {last_close},
     "analysis_type": "NEWS_RESEARCH",
-    "timestamp_utc": "2026-08-09T18:50:00Z"
+    "timestamp_utc": "{current_timestamp_iso}"
   }},
   "market_sentiment_summary": {{
     "overall_sentiment": "[Molto Positivo / Positivo / Neutro / Negativo / Molto Negativo]",
@@ -449,6 +452,16 @@ Rispondi ESCLUSIVAMENTE con un JSON valido con questa struttura di RICERCA NEWS 
             json_text = data["choices"][0]["message"]["content"]
             # Sanitize corrupted unicode characters or missing euro symbols
             json_text = json_text.replace('\ufffd', '€')
+            
+            # Garantisci che il timestamp_utc sia la data/ora esatta corrente di esecuzione
+            try:
+                parsed_obj = json.loads(json_text)
+                if "search_metadata" in parsed_obj:
+                    parsed_obj["search_metadata"]["timestamp_utc"] = current_timestamp_iso
+                json_text = json.dumps(parsed_obj, indent=2, ensure_ascii=False)
+            except Exception:
+                pass
+                
             return json_text
     except Exception as e:
         safe_print(f"Errore OpenAI Agent formatting ({e}). Restituisco risposta grezza.")
