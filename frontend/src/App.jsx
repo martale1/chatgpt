@@ -139,7 +139,7 @@ export default function App() {
     }
     // Migrazione da salvataggio precedente o lista standard
     const legacySaved = localStorage.getItem('watchlist_tickers');
-    let legacyList = ['AVIO.MI', 'VOD.L', 'A2A.MI', 'NVDA', 'AAPL', 'STLAM.MI', 'AMD.O', 'BC.MI', 'ENEL.MI', 'STMMI.MI', 'SRG.MI', 'REY.MI', 'CPR.MI'];
+    let legacyList = ['AVIO.MI', 'VOD.L', 'A2A.MI', 'NVDA', 'AAPL', 'STLAM.MI', 'AMD.O', 'BC.MI', 'ENEL.MI', 'STMMI.MI', 'SRG.MI', 'REY.MI', 'CPR.MI', 'PRY.MI'];
     if (legacySaved) {
       try {
         const parsed = JSON.parse(legacySaved);
