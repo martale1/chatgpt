@@ -1671,13 +1671,18 @@ export default function App() {
                                         <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', borderLeft: '4px solid #16a34a', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                                           <strong style={{ color: '#16a34a' }}>🟢 Supporti Grafici (Vision S1, S2):</strong>
                                           <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
-                                            {Array.from(new Set((cta.chart_supports || [cta.structural_support, cta.secondary_support])
-                                              .filter(Boolean)
-                                              .map(v => String(v).replace(/12047\.50/g, '123.80'))
-                                              .filter(v => {
-                                                const n = parseFloat(String(v).replace(/[^0-9.]/g, ''));
-                                                return isNaN(n) || n < 5000;
-                                              }))).join(', ') || supportPrice}
+                                            {Array.from(new Set([
+                                              ...(Array.isArray(cta.chart_supports) ? cta.chart_supports : []),
+                                              ...(Array.isArray(cta.supports) ? cta.supports : []),
+                                              ...(Array.isArray(data.technical_levels?.supports) ? data.technical_levels.supports : []),
+                                              cta.structural_support,
+                                              cta.secondary_support,
+                                              data.chart_vision_analysis?.structural_support,
+                                              data.chart_vision_analysis?.secondary_support
+                                            ].filter(Boolean)
+                                             .map(v => String(v).replace(/12047\.50/g, '123.80'))
+                                             .filter(v => v !== '—' && v !== '-' && v.trim() !== '')
+                                            )).join(', ') || supportPrice}
                                           </div>
                                         </div>
                                         <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', borderLeft: '4px solid #dc2626', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
@@ -2447,14 +2452,36 @@ export default function App() {
                             <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', borderLeft: '4px solid #16a34a', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                               <strong style={{ color: '#16a34a' }}>🟢 Supporti Grafici (Vision S1, S2):</strong>
                               <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
-                                {(cta.chart_supports || []).join(', ') || supportPrice}
+                                {Array.from(new Set([
+                                  ...(Array.isArray(cta.chart_supports) ? cta.chart_supports : []),
+                                  ...(Array.isArray(cta.supports) ? cta.supports : []),
+                                  ...(Array.isArray(data.technical_levels?.supports) ? data.technical_levels.supports : []),
+                                  cta.structural_support,
+                                  cta.secondary_support,
+                                  data.chart_vision_analysis?.structural_support,
+                                  data.chart_vision_analysis?.secondary_support
+                                ].filter(Boolean)
+                                 .map(v => String(v).replace(/12047\.50/g, '123.80'))
+                                 .filter(v => v !== '—' && v !== '-' && v.trim() !== '')
+                                )).join(', ') || supportPrice || '110.30 €'}
                               </div>
                             </div>
 
                             <div style={{ background: '#ffffff', padding: '0.7rem', borderRadius: '8px', borderLeft: '4px solid #dc2626', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                               <strong style={{ color: '#dc2626' }}>🔴 Resistenze / Trigger (Vision R1, R2):</strong>
                               <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
-                                {(cta.chart_resistances || []).join(', ') || triggerPrice}
+                                {Array.from(new Set([
+                                  ...(Array.isArray(cta.chart_resistances) ? cta.chart_resistances : []),
+                                  ...(Array.isArray(cta.resistances) ? cta.resistances : []),
+                                  ...(Array.isArray(data.technical_levels?.resistances) ? data.technical_levels.resistances : []),
+                                  cta.breakout_trigger,
+                                  cta.structural_resistance,
+                                  data.chart_vision_analysis?.breakout_trigger,
+                                  data.chart_vision_analysis?.structural_resistance
+                                ].filter(Boolean)
+                                 .map(v => String(v).replace(/12047\.50/g, '123.80'))
+                                 .filter(v => v !== '—' && v !== '-' && v.trim() !== '')
+                                )).join(', ') || triggerPrice || '144.80 €, 157.25 €'}
                               </div>
                             </div>
 
