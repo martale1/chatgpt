@@ -8,6 +8,32 @@ const getSentimentColor = (score) => {
   if (score >= 0.45) return { bg: 'rgba(234,179,8,0.10)',  border: '#ca8a04', text: '#fbbf24',  label: 'Neutro' };
   if (score >= 0.25) return { bg: 'rgba(249,115,22,0.10)', border: '#ea580c', text: '#fb923c',  label: 'Liev. Negativo' };
   return               { bg: 'rgba(239,68,68,0.10)',  border: '#dc2626', text: '#f87171',  label: 'Negativo' };
+const getIndicatorCardStyle = (text, explicitSentiment) => {
+  let sentiment = explicitSentiment;
+  if (!sentiment && text) {
+    const lower = text.toLowerCase();
+    const isIndecision = lower.includes('doji') || lower.includes('indecisione') || lower.includes('in consolidamento') || lower.includes('neutro');
+    const posKeys = ['rialzista', 'rialziste', 'rialzo', 'bullish', 'positivo', 'positiva', 'ipervenduto', 'rimbalzo', 'acquisto', 'espansione rialzista', 'hammer', 'doppio minimo', 'engulfing rialzista'];
+    const negKeys = ['ribassista', 'ribassiste', 'ribasso', 'bearish', 'negativo', 'negativa', 'ipercomprato', 'vendita', 'inversione ribassista', 'testa e spalle', 'engulfing ribassista', 'scendono', 'pressione di vendita', 'debolezza'];
+
+    let pos = 0, neg = 0;
+    posKeys.forEach(k => { if (lower.includes(k)) pos++; });
+    negKeys.forEach(k => { if (lower.includes(k)) neg++; });
+
+    if (isIndecision && pos === 0 && neg === 0) sentiment = 'Neutro';
+    else if (pos > neg) sentiment = 'Positivo';
+    else if (neg > pos) sentiment = 'Negativo';
+    else sentiment = 'Neutro';
+  }
+
+  const s = String(sentiment || 'Neutro').toLowerCase();
+  if (s.includes('positi') || s.includes('rialzi') || s.includes('bull')) {
+    return { label: 'Positivo', color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0', borderLeft: '5px solid #16a34a', badgeBg: '#dcfce7', icon: '🟢' };
+  } else if (s.includes('negati') || s.includes('ribassi') || s.includes('bear')) {
+    return { label: 'Negativo', color: '#b91c1c', bg: '#fef2f2', border: '#fecaca', borderLeft: '5px solid #dc2626', badgeBg: '#fee2e2', icon: '🔴' };
+  } else {
+    return { label: 'Neutro', color: '#b45309', bg: '#fffbeb', border: '#fde68a', borderLeft: '5px solid #d97706', badgeBg: '#fef3c7', icon: '🟡' };
+  }
 };
 
 // ── NewsCard ────────────────────────────────────────────────────────────────────
@@ -1698,41 +1724,77 @@ export default function App() {
                                              </div>
                                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
                                                
-                                               {(cta.candlestick_analysis || cta.chart_pattern) && (
-                                                 <div style={{ background: '#ffffff', padding: '0.75rem 0.9rem', borderRadius: '10px', border: '1px solid #e2e8f0', borderLeft: '4px solid #8b5cf6', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                                                   <strong style={{ color: '#7c3aed', fontSize: '0.84rem' }}>🕯️ Pattern Candele &amp; Price Action:</strong>
-                                                   <div style={{ marginTop: '5px', color: '#1e293b', fontSize: '0.83rem', lineHeight: 1.5 }}>
-                                                     {cta.candlestick_analysis || `Pattern grafico identificato: ${cta.chart_pattern}`}
+                                               {(cta.candlestick_analysis || cta.chart_pattern) && (() => {
+                                                 const txt = cta.candlestick_analysis || `Pattern grafico identificato: ${cta.chart_pattern}`;
+                                                 const st = getIndicatorCardStyle(txt, cta.candlestick_sentiment);
+                                                 return (
+                                                   <div style={{ background: st.bg, padding: '0.75rem 0.9rem', borderRadius: '10px', border: `1px solid ${st.border}`, borderLeft: st.borderLeft, boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                                                       <strong style={{ color: '#475569', fontSize: '0.84rem' }}>🕯️ Pattern Candele &amp; Price Action:</strong>
+                                                       <span style={{ background: st.badgeBg, color: st.color, padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700 }}>
+                                                         {st.icon} {st.label}
+                                                       </span>
+                                                     </div>
+                                                     <div style={{ marginTop: '4px', color: '#0f172a', fontSize: '0.83rem', lineHeight: 1.5 }}>
+                                                       {txt}
+                                                     </div>
                                                    </div>
-                                                 </div>
-                                               )}
+                                                 );
+                                               })()}
 
-                                               {cta.alligator_ma_analysis && (
-                                                 <div style={{ background: '#ffffff', padding: '0.75rem 0.9rem', borderRadius: '10px', border: '1px solid #e2e8f0', borderLeft: '4px solid #0284c7', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                                                   <strong style={{ color: '#0369a1', fontSize: '0.84rem' }}>🐊 Williams Alligator &amp; Medie (Jaw, Teeth, Lips, EMA):</strong>
-                                                   <div style={{ marginTop: '5px', color: '#1e293b', fontSize: '0.83rem', lineHeight: 1.5 }}>
-                                                     {cta.alligator_ma_analysis}
+                                               {cta.alligator_ma_analysis && (() => {
+                                                 const txt = cta.alligator_ma_analysis;
+                                                 const st = getIndicatorCardStyle(txt, cta.alligator_sentiment);
+                                                 return (
+                                                   <div style={{ background: st.bg, padding: '0.75rem 0.9rem', borderRadius: '10px', border: `1px solid ${st.border}`, borderLeft: st.borderLeft, boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                                                       <strong style={{ color: '#475569', fontSize: '0.84rem' }}>🐊 Williams Alligator &amp; Medie (Jaw, Teeth, Lips, EMA):</strong>
+                                                       <span style={{ background: st.badgeBg, color: st.color, padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700 }}>
+                                                         {st.icon} {st.label}
+                                                       </span>
+                                                     </div>
+                                                     <div style={{ marginTop: '4px', color: '#0f172a', fontSize: '0.83rem', lineHeight: 1.5 }}>
+                                                       {txt}
+                                                     </div>
                                                    </div>
-                                                 </div>
-                                               )}
+                                                 );
+                                               })()}
 
-                                               {cta.macd_adx_analysis && (
-                                                 <div style={{ background: '#ffffff', padding: '0.75rem 0.9rem', borderRadius: '10px', border: '1px solid #e2e8f0', borderLeft: '4px solid #d97706', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                                                   <strong style={{ color: '#b45309', fontSize: '0.84rem' }}>📉 MACD &amp; ADX (Forza del Trend &amp; Momentum):</strong>
-                                                   <div style={{ marginTop: '5px', color: '#1e293b', fontSize: '0.83rem', lineHeight: 1.5 }}>
-                                                     {cta.macd_adx_analysis}
+                                               {cta.macd_adx_analysis && (() => {
+                                                 const txt = cta.macd_adx_analysis;
+                                                 const st = getIndicatorCardStyle(txt, cta.macd_adx_sentiment);
+                                                 return (
+                                                   <div style={{ background: st.bg, padding: '0.75rem 0.9rem', borderRadius: '10px', border: `1px solid ${st.border}`, borderLeft: st.borderLeft, boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                                                       <strong style={{ color: '#475569', fontSize: '0.84rem' }}>📉 MACD &amp; ADX (Forza del Trend &amp; Momentum):</strong>
+                                                       <span style={{ background: st.badgeBg, color: st.color, padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700 }}>
+                                                         {st.icon} {st.label}
+                                                       </span>
+                                                     </div>
+                                                     <div style={{ marginTop: '4px', color: '#0f172a', fontSize: '0.83rem', lineHeight: 1.5 }}>
+                                                       {txt}
+                                                     </div>
                                                    </div>
-                                                 </div>
-                                               )}
+                                                 );
+                                               })()}
 
-                                               {cta.volume_oscillator_analysis && (
-                                                 <div style={{ background: '#ffffff', padding: '0.75rem 0.9rem', borderRadius: '10px', border: '1px solid #e2e8f0', borderLeft: '4px solid #059669', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                                                   <strong style={{ color: '#047857', fontSize: '0.84rem' }}>📊 Volumi &amp; Oscillatori (RSI / Stocastico):</strong>
-                                                   <div style={{ marginTop: '5px', color: '#1e293b', fontSize: '0.83rem', lineHeight: 1.5 }}>
-                                                     {cta.volume_oscillator_analysis}
+                                               {cta.volume_oscillator_analysis && (() => {
+                                                 const txt = cta.volume_oscillator_analysis;
+                                                 const st = getIndicatorCardStyle(txt, cta.volume_oscillator_sentiment);
+                                                 return (
+                                                   <div style={{ background: st.bg, padding: '0.75rem 0.9rem', borderRadius: '10px', border: `1px solid ${st.border}`, borderLeft: st.borderLeft, boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                                                       <strong style={{ color: '#475569', fontSize: '0.84rem' }}>📊 Volumi &amp; Oscillatori (RSI / Stocastico):</strong>
+                                                       <span style={{ background: st.badgeBg, color: st.color, padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700 }}>
+                                                         {st.icon} {st.label}
+                                                       </span>
+                                                     </div>
+                                                     <div style={{ marginTop: '4px', color: '#0f172a', fontSize: '0.83rem', lineHeight: 1.5 }}>
+                                                       {txt}
+                                                     </div>
                                                    </div>
-                                                 </div>
-                                               )}
+                                                 );
+                                               })()}
 
                                              </div>
                                            </div>
