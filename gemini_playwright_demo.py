@@ -213,14 +213,18 @@ def send_gemini_prompt(page, prompt, image_path=None):
         except Exception:
             box.focus()
 
-    box.fill(prompt)
     try:
-        box.evaluate("el => el.dispatchEvent(new Event('input', { bubbles: true }))")
-        box.evaluate("el => el.dispatchEvent(new Event('change', { bubbles: true }))")
+        page.keyboard.press("Control+A")
+        page.keyboard.press("Backspace")
     except Exception:
         pass
 
-    page.wait_for_timeout(800)
+    try:
+        page.keyboard.insert_text(prompt)
+    except Exception:
+        box.fill(prompt)
+
+    page.wait_for_timeout(600)
     safe_print("Prompt inserito in Gemini Web, invio in corso...")
     
     send_selectors = [
@@ -228,11 +232,8 @@ def send_gemini_prompt(page, prompt, image_path=None):
         "button[aria-label*='Invia']",
         "button[aria-label*='Send']",
         "button[aria-label*='Submit']",
-        "button[aria-label*='invia']",
-        "button[aria-label*='send']",
         "button:has(mat-icon[fonticon='send'])",
-        "button:has(mat-icon[fonticon='send_spark'])",
-        "mat-icon[fonticon='send']"
+        "button:has(mat-icon[fonticon='send_spark'])"
     ]
     
     clicked = False
@@ -245,7 +246,7 @@ def send_gemini_prompt(page, prompt, image_path=None):
                     if b.is_visible():
                         b.click(force=True)
                         clicked = True
-                        safe_print(f"✅ Pulsante Invia di Gemini Web cliccato ({sel})!")
+                        safe_print(f"✅ Pulsante Invia cliccato ({sel})!")
                         break
                 except Exception:
                     continue
