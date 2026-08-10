@@ -561,6 +561,32 @@ def find_chrome_executable():
             return p
     return None
 
+def cleanup_stale_gemini_chrome():
+    """Rimuove processi zombie di Chrome legati a gemini_chrome_profile per liberare il ProcessSingleton Lock file (Error 0x20)."""
+    import subprocess
+    try:
+        ps_cmd = (
+            'powershell -Command "'
+            'Get-WmiObject Win32_Process -Filter \\"name=\'chrome.exe\'\\" | '
+            'Where-Object { $_.CommandLine -like \\"*gemini_chrome_profile*\\" } | '
+            'ForEach-Object { Stop-Process -Id $_.ProcessId -Force }'
+            '"'
+        )
+        subprocess.run(ps_cmd, shell=True, capture_output=True)
+    except Exception:
+        pass
+
+    for prof_name in ["gemini_chrome_profile", "gemini_chrome_profile_fallback", "gemini_chrome_profile_run"]:
+        p_dir = Path(prof_name)
+        if p_dir.exists():
+            for lock_name in ["SingletonLock", "SingletonSocket", "SingletonCookie"]:
+                try:
+                    l_file = p_dir / lock_name
+                    if l_file.exists():
+                        l_file.unlink()
+                except Exception:
+                    pass
+
 def ensure_visible_chrome(cdp_url=DEFAULT_CDP_URL):
     import urllib.request
     import time
@@ -572,6 +598,8 @@ def ensure_visible_chrome(cdp_url=DEFAULT_CDP_URL):
         return True
     except Exception:
         pass
+
+    cleanup_stale_gemini_chrome()
 
     chrome_exe = find_chrome_executable()
     if not chrome_exe:
@@ -606,19 +634,6 @@ def ensure_visible_chrome(cdp_url=DEFAULT_CDP_URL):
             continue
     return False
 
-def get_clean_profile_dir():
-    profile_dir = Path("gemini_chrome_profile")
-    profile_dir.mkdir(exist_ok=True)
-    # Rimuove file di lock residui se Chrome era stato terminato in modo anomalo
-    for lock_name in ["SingletonLock", "SingletonSocket", "SingletonCookie"]:
-        try:
-            lock_file = profile_dir / lock_name
-            if lock_file.exists():
-                lock_file.unlink()
-        except Exception:
-            pass
-    return profile_dir
-
 def main():
     load_env_file()
     parser = argparse.ArgumentParser(description="Agent Gemini Web via Playwright + OpenAI Parsing Agent.")
@@ -637,7 +652,7 @@ def main():
 
     with sync_playwright() as p:
         context = None
-        # 1. Prova a connettersi ad una finestra Chrome aperta dall'utente (Porta 9222)
+        # 1. Prova a connettersi ad una finestra Chrome aperta (Porta 9222)
         if args.cdp:
             try:
                 safe_print(f"🔌 Tentativo connessione a Chrome visibile sulla porta {args.cdp}...")
@@ -661,7 +676,8 @@ def main():
 
         # 3. Fallback Playwright visibile se CDP non risponde
         if not context:
-            profile_path = str(get_clean_profile_dir())
+            cleanup_stale_gemini_chrome()
+            profile_path = str(PROFILE_DIR)
             try:
                 safe_print("🚀 Avvio della finestra reale di Google Chrome su Windows Desktop...")
                 context = p.chromium.launch_persistent_context(
@@ -677,10 +693,10 @@ def main():
                 )
                 safe_print("✅ Finestra di Google Chrome aperta in primo piano sul tuo schermo!")
             except Exception as e:
-                safe_print(f"⚠️ Avvio su profilo primario ({e}). Uso profilo di sessione dedicato...")
-                temp_profile = str(Path("gemini_chrome_profile_run"))
+                safe_print(f"⚠️ Avvio su profilo primario ({e}). Uso profilo di sessione unico...")
+                unique_session_profile = str(Path(f"gemini_chrome_profile_session_{int(time.time())}"))
                 context = p.chromium.launch_persistent_context(
-                    user_data_dir=temp_profile,
+                    user_data_dir=unique_session_profile,
                     headless=False,
                     args=[
                         "--start-maximized",
