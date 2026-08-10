@@ -1268,25 +1268,31 @@ export default function App() {
                                  ⚡ Aggiorna Entrambi
                                </button>
 
-                               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                                 {data.search_metadata.timestamp_utc && (
-                                   <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                     📰 News: {new Date(data.search_metadata.timestamp_utc).toLocaleString('it-IT', {
-                                       day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                                     })}
-                                   </span>
-                                 )}
-                                 {(() => {
-                                   const chartData = realTickerData[(query || data?.search_metadata?.ticker) + '_CHART'];
-                                   return chartData?.search_metadata?.timestamp_utc && (
-                                     <span style={{ fontSize: '0.78rem', background: '#faf5ff', border: '1px solid #e9d5ff', color: '#7e22ce', padding: '0.15rem 0.55rem', borderRadius: '6px', fontWeight: '600' }}>
-                                       📊 Grafico AI: {new Date(chartData.search_metadata.timestamp_utc).toLocaleString('it-IT', {
-                                         day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                                       })}
-                                     </span>
-                                   );
-                                 })()}
-                               </div>
+                                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                                  {data.search_metadata.timestamp_utc && (
+                                    <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                      📰 News: {new Date(data.search_metadata.timestamp_utc).toLocaleString('it-IT', {
+                                        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                      })}
+                                    </span>
+                                  )}
+                                  {(() => {
+                                    const activeT = (data?.search_metadata?.ticker || query || '').toUpperCase();
+                                    const candidateKeys = [
+                                      activeT + '_CHART',
+                                      (query || '') + '_CHART',
+                                      activeT.toLowerCase() + '_CHART'
+                                    ];
+                                    const chartData = candidateKeys.map(k => realTickerData[k]).find(d => d?.search_metadata?.timestamp_utc);
+                                    return chartData?.search_metadata?.timestamp_utc && (
+                                      <span style={{ fontSize: '0.78rem', background: '#faf5ff', border: '1px solid #e9d5ff', color: '#7e22ce', padding: '0.15rem 0.55rem', borderRadius: '6px', fontWeight: '600' }}>
+                                        📊 Grafico AI: {new Date(chartData.search_metadata.timestamp_utc).toLocaleString('it-IT', {
+                                          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                        })}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
                             </div>
 
                             <div className="summary-grid">
