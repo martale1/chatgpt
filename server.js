@@ -360,10 +360,12 @@ for ticker in tickers:
     try:
         instrument = yf.Ticker(ticker)
         price = None
+        previous_close = None
         method = None
         market_timestamp = None
         try:
             price = instrument.fast_info.get('lastPrice')
+            previous_close = instrument.fast_info.get('previousClose')
             if price is not None:
                 method = 'fast_info.lastPrice'
         except Exception:
@@ -378,10 +380,17 @@ for ticker in tickers:
             if not history.empty:
                 price = float(history['Close'].dropna().iloc[-1])
                 market_timestamp = history.index[-1].isoformat()
+                if previous_close is None and len(history['Close'].dropna()) >= 2:
+                    previous_close = float(history['Close'].dropna().iloc[-2])
         if price is None:
             raise ValueError('Prezzo Yahoo Finance non disponibile')
+        daily_change_pct = None
+        if previous_close is not None and float(previous_close) > 0:
+            daily_change_pct = ((float(price) - float(previous_close)) / float(previous_close)) * 100
         prices[ticker] = {
             'price': round(float(price), 4),
+            'previous_close': round(float(previous_close), 4) if previous_close is not None else None,
+            'daily_change_pct': round(float(daily_change_pct), 2) if daily_change_pct is not None else None,
             'source': 'Yahoo Finance',
             'method': method,
             'market_timestamp': market_timestamp,
