@@ -661,7 +661,7 @@ header p { color: var(--text-muted); }
 .portfolio-notes { grid-column: span 4; }
 .portfolio-form-actions { grid-column: span 2; display: flex; align-items: flex-end; gap: 0.5rem; }
 .portfolio-table { margin-top: 1rem; overflow-x: auto; }
-.portfolio-row { min-width: 1120px; display: grid; grid-template-columns: minmax(170px,1.2fr) 80px 115px 115px 135px 150px 105px 190px; gap: 0.7rem; align-items: center; padding: 0.75rem; color: #cbd5e1; border-bottom: 1px solid rgba(148,163,184,0.14); font-size: 0.8rem; }
+.portfolio-row { min-width: 1240px; display: grid; grid-template-columns: minmax(170px,1.2fr) 80px 115px 125px 115px 135px 150px 105px 190px; gap: 0.7rem; align-items: center; padding: 0.75rem; color: #cbd5e1; border-bottom: 1px solid rgba(148,163,184,0.14); font-size: 0.8rem; }
 .portfolio-row > span:first-child { display: flex; flex-direction: column; gap: 0.15rem; }
 .portfolio-row small { color: #64748b; }
 .portfolio-row em { color: #94a3b8; font-size: 0.7rem; font-style: normal; }
@@ -674,7 +674,13 @@ header p { color: var(--text-muted); }
 .portfolio-gain.negative { color: #f87171; }
 .portfolio-gain.neutral { color: #64748b; }
 .portfolio-gain small { color: inherit; font-weight: 700; }
+.portfolio-configured-stop { display: flex; flex-direction: column; gap: .15rem; color: #fca5a5; }
+.portfolio-configured-stop small { font-weight: 800; }
+.portfolio-configured-stop .stop-review-keep { color: #4ade80; }
+.portfolio-configured-stop .stop-review-modify, .portfolio-configured-stop .stop-review-review_required { color: #fbbf24; }
+.portfolio-configured-stop .stop-review-remove { color: #f87171; }
 .portfolio-update-price { padding: .25rem .4rem; color: #7dd3fc; border: 1px solid rgba(56,189,248,.3); border-radius: 5px; background: rgba(56,189,248,.08); cursor: pointer; font-size: .68rem; }
+.portfolio-price-stale strong, .portfolio-price-stale small { color: #facc15 !important; }
 .portfolio-analysis-import { display: none; }
 .portfolio-row-signals { min-width: 1120px; display: flex; align-items: center; gap: 1rem; padding: .45rem .75rem; color: #94a3b8; border-bottom: 1px solid rgba(148,163,184,.14); background: rgba(2,6,23,.28); font-size: .7rem; }
 .portfolio-row-signals > strong { color: #c4b5fd; }

@@ -69,6 +69,7 @@ const normalizePortfolioAnalysis = (input, portfolioTickers) => {
  if (!Array.isArray(input.securities) || !input.securities.length) throw new Error('Il JSON deve contenere almeno una voce in securities.');
  const allowedActions = new Set(['HOLD', 'HOLD_OR_TRAILING_STOP', 'REDUCE', 'REVIEW_POSITION', 'EXIT_CANDIDATE']);
  const allowedPlanStatuses = new Set(['ACTIVE', 'WAIT_CONFIRMATION', 'REVIEW_REQUIRED', 'NOT_AVAILABLE']);
+ const allowedStopReviewRecommendations = new Set(['KEEP', 'MODIFY', 'REMOVE', 'REVIEW_REQUIRED']);
  const securities = input.securities.map((item, index) => {
   const ticker = String(item?.ticker || '').trim().toUpperCase();
   if (!ticker) throw new Error(`Posizione #${index + 1}: ticker mancante.`);
@@ -80,7 +81,10 @@ const normalizePortfolioAnalysis = (input, portfolioTickers) => {
   const planStatus = String(plan.plan_status || 'NOT_AVAILABLE').toUpperCase();
   if (!allowedPlanStatuses.has(planStatus)) throw new Error(`${ticker}: plan_status non valido.`);
   const numericOrNull = value => Number.isFinite(Number(value)) && value !== null ? Number(value) : null;
-  return { ...item, ticker, portfolio_assessment: { ...assessment, recommended_action: action }, operational_plan: { ...plan, plan_status: planStatus, reference_price: numericOrNull(plan.reference_price), stop_loss: { ...(plan.stop_loss || {}), level: numericOrNull(plan.stop_loss?.level) }, take_profit_levels: Array.isArray(plan.take_profit_levels) ? plan.take_profit_levels.slice(0, 3).map(tp => ({ ...tp, level: numericOrNull(tp.level) })) : [], trailing_stop: { enabled: Boolean(plan.trailing_stop?.enabled), ...(plan.trailing_stop || {}) }, confirmation_conditions: Array.isArray(plan.confirmation_conditions) ? plan.confirmation_conditions : [], invalidation_conditions: Array.isArray(plan.invalidation_conditions) ? plan.invalidation_conditions : [], monitoring_triggers: Array.isArray(plan.monitoring_triggers) ? plan.monitoring_triggers : [] } };
+  const stopReview = item.stop_loss_review || {};
+  const stopRecommendation = String(stopReview.recommendation || 'REVIEW_REQUIRED').toUpperCase();
+  if (!allowedStopReviewRecommendations.has(stopRecommendation)) throw new Error(`${ticker}: stop_loss_review.recommendation non valida.`);
+  return { ...item, ticker, stop_loss_review: { ...stopReview, configured_level: numericOrNull(stopReview.configured_level), suggested_level: numericOrNull(stopReview.suggested_level), recommendation: stopRecommendation }, portfolio_assessment: { ...assessment, recommended_action: action }, operational_plan: { ...plan, plan_status: planStatus, reference_price: numericOrNull(plan.reference_price), stop_loss: { ...(plan.stop_loss || {}), level: numericOrNull(plan.stop_loss?.level) }, take_profit_levels: Array.isArray(plan.take_profit_levels) ? plan.take_profit_levels.slice(0, 3).map(tp => ({ ...tp, level: numericOrNull(tp.level) })) : [], trailing_stop: { enabled: Boolean(plan.trailing_stop?.enabled), ...(plan.trailing_stop || {}) }, confirmation_conditions: Array.isArray(plan.confirmation_conditions) ? plan.confirmation_conditions : [], invalidation_conditions: Array.isArray(plan.invalidation_conditions) ? plan.invalidation_conditions : [], monitoring_triggers: Array.isArray(plan.monitoring_triggers) ? plan.monitoring_triggers : [] } };
  });
  return { ...input, securities };
 };
@@ -332,9 +336,17 @@ export default function App() {
    return [];
   }
  });
- const [portfolioForm, setPortfolioForm] = useState({ ticker: '', company: '', quantity: '', entryPrice: '', purchaseDate: '', fees: '', notes: '' });
+ const [portfolioForm, setPortfolioForm] = useState({ ticker: '', company: '', quantity: '', entryPrice: '', configuredStopLoss: '', purchaseDate: '', fees: '', notes: '' });
  const [portfolioEditingTicker, setPortfolioEditingTicker] = useState(null);
  const [portfolioStatus, setPortfolioStatus] = useState(null);
+ const [portfolioPrices, setPortfolioPrices] = useState({});
+ const [portfolioLastPrices, setPortfolioLastPrices] = useState(() => {
+  try {
+   const saved = localStorage.getItem('portfolio_last_yahoo_prices');
+   return saved ? JSON.parse(saved) : {};
+  } catch { return {}; }
+ });
+ const [portfolioPricesStatus, setPortfolioPricesStatus] = useState({ state: 'idle', message: '' });
  const [showPortfolioForm, setShowPortfolioForm] = useState(false);
  const [portfolioPdfProgress, setPortfolioPdfProgress] = useState(null);
  const [portfolioAnalysis, setPortfolioAnalysis] = useState(() => { try { const saved = localStorage.getItem('portfolio_analysis_output'); return saved ? JSON.parse(saved) : null; } catch { return null; } });
@@ -481,6 +493,42 @@ export default function App() {
  }, [portfolio]);
 
  useEffect(() => {
+  if (activeTab !== 'portfolio') return;
+  const controller = new AbortController();
+  setPortfolioPrices({});
+  if (!portfolio.length) {
+   setPortfolioPricesStatus({ state: 'idle', message: 'Nessuna posizione da aggiornare.' });
+   return () => controller.abort();
+  }
+  setPortfolioPricesStatus({ state: 'loading', message: 'Recupero ultimo prezzo da Yahoo Finance...' });
+  const tickers = portfolio.map(item => item.ticker).join(',');
+  fetch(`/api/portfolio-prices?tickers=${encodeURIComponent(tickers)}`, { signal: controller.signal, cache: 'no-store' })
+   .then(async response => {
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || 'Yahoo Finance non disponibile.');
+    return payload;
+   })
+   .then(payload => {
+    const prices = payload.prices && typeof payload.prices === 'object' ? payload.prices : {};
+    setPortfolioPrices(prices);
+    setPortfolioLastPrices(previous => {
+     const updated = { ...previous, ...prices };
+     localStorage.setItem('portfolio_last_yahoo_prices', JSON.stringify(updated));
+     return updated;
+    });
+    const count = Object.keys(prices).length;
+    const failed = portfolio.length - count;
+    setPortfolioPricesStatus({ state: failed ? 'warning' : 'success', message: `${count}/${portfolio.length} prezzi recuperati ora da Yahoo Finance${failed ? `; ${failed} non disponibili` : ''}.` });
+   })
+   .catch(error => {
+    if (error.name === 'AbortError') return;
+    setPortfolioPrices({});
+    setPortfolioPricesStatus({ state: 'error', message: `Aggiornamento Yahoo Finance fallito: ${error.message}` });
+   });
+  return () => controller.abort();
+ }, [activeTab]);
+
+ useEffect(() => {
   if (portfolioAnalysis) localStorage.setItem('portfolio_analysis_output', JSON.stringify(portfolioAnalysis));
   else localStorage.removeItem('portfolio_analysis_output');
  }, [portfolioAnalysis]);
@@ -533,7 +581,7 @@ export default function App() {
  };
 
  const resetPortfolioForm = () => {
-  setPortfolioForm({ ticker: '', company: '', quantity: '', entryPrice: '', purchaseDate: '', fees: '', notes: '' });
+  setPortfolioForm({ ticker: '', company: '', quantity: '', entryPrice: '', configuredStopLoss: '', purchaseDate: '', fees: '', notes: '' });
   setPortfolioEditingTicker(null);
   setShowPortfolioForm(false);
  };
@@ -543,13 +591,15 @@ export default function App() {
   const ticker = portfolioForm.ticker.trim().toUpperCase();
   const quantity = Number(portfolioForm.quantity);
   const entryPrice = Number(portfolioForm.entryPrice);
+  const configuredStopLoss = portfolioForm.configuredStopLoss === '' ? null : Number(portfolioForm.configuredStopLoss);
   const fees = portfolioForm.fees === '' ? 0 : Number(portfolioForm.fees);
   if (!ticker) return setPortfolioStatus({ type: 'error', message: 'Inserisci il ticker.' });
   if (!Number.isFinite(quantity) || quantity <= 0) return setPortfolioStatus({ type: 'error', message: 'La quantita deve essere maggiore di zero.' });
   if (!Number.isFinite(entryPrice) || entryPrice <= 0) return setPortfolioStatus({ type: 'error', message: 'Il prezzo medio di carico deve essere maggiore di zero.' });
+  if (configuredStopLoss !== null && (!Number.isFinite(configuredStopLoss) || configuredStopLoss <= 0)) return setPortfolioStatus({ type: 'error', message: 'Lo stop loss configurato deve essere maggiore di zero.' });
   if (!Number.isFinite(fees) || fees < 0) return setPortfolioStatus({ type: 'error', message: 'Le commissioni non sono valide.' });
   if (!portfolioEditingTicker && portfolio.some(item => item.ticker === ticker)) return setPortfolioStatus({ type: 'error', message: `${ticker} e gia presente. Usa Modifica per aggiornare la posizione.` });
-  const position = { ticker, company: portfolioForm.company.trim() || ticker, quantity, entry_price: entryPrice, purchase_date: portfolioForm.purchaseDate || null, fees, notes: portfolioForm.notes.trim(), updated_at: new Date().toISOString() };
+  const position = { ticker, company: portfolioForm.company.trim() || ticker, quantity, entry_price: entryPrice, configured_stop_loss: configuredStopLoss, purchase_date: portfolioForm.purchaseDate || null, fees, notes: portfolioForm.notes.trim(), updated_at: new Date().toISOString() };
   setPortfolio(prev => portfolioEditingTicker ? prev.map(item => item.ticker === portfolioEditingTicker ? position : item) : [...prev, position]);
   setPortfolioStatus({ type: 'success', message: `${ticker} salvato nel portafoglio.` });
   resetPortfolioForm();
@@ -557,7 +607,7 @@ export default function App() {
 
  const editPortfolioPosition = (position) => {
   setPortfolioEditingTicker(position.ticker);
-  setPortfolioForm({ ticker: position.ticker, company: position.company || '', quantity: String(position.quantity), entryPrice: String(position.entry_price), purchaseDate: position.purchase_date || '', fees: String(position.fees || ''), notes: position.notes || '' });
+  setPortfolioForm({ ticker: position.ticker, company: position.company || '', quantity: String(position.quantity), entryPrice: String(position.entry_price), configuredStopLoss: position.configured_stop_loss == null ? '' : String(position.configured_stop_loss), purchaseDate: position.purchase_date || '', fees: String(position.fees || ''), notes: position.notes || '' });
   setPortfolioStatus(null);
   setShowPortfolioForm(true);
  };
@@ -1129,7 +1179,7 @@ const watchlistRows = watchlist.map((t) => {
 
  const portfolioSummary = portfolio.reduce((summary, position) => {
   const invested = (position.quantity * position.entry_price) + (position.fees || 0);
-  const livePrice = Number(realTickerData[position.ticker]?.search_metadata?.current_market_price);
+  const livePrice = Number(portfolioPrices[position.ticker]?.price);
   summary.totalInvested += invested;
   if (Number.isFinite(livePrice) && livePrice > 0) {
    summary.pricedInvested += invested;
@@ -1397,7 +1447,7 @@ const watchlistRows = watchlist.map((t) => {
     <section className="portfolio-card">
      <div className="portfolio-kpi-grid">
       <div><span>Totale investito</span><strong>{portfolioSummary.totalInvested.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</strong></div>
-      <div><span>Valorizzazione EUR</span><strong>{portfolioSummary.pricedPositions ? portfolioSummary.marketValue.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' }) : '-'}</strong><small>{portfolioSummary.pricedPositions}/{portfolio.length} prezzi aggiornati</small></div>
+      <div><span>Valorizzazione EUR</span><strong>{portfolioSummary.pricedPositions ? portfolioSummary.marketValue.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' }) : '-'}</strong><small>{portfolioPricesStatus.state === 'loading' ? 'Aggiornamento Yahoo Finance...' : `${portfolioSummary.pricedPositions}/${portfolio.length} prezzi Yahoo recuperati ora`}</small></div>
       <div className={portfolioSummary.totalGain >= 0 ? 'positive' : 'negative'}><span>Utile / Perdita</span><strong>{portfolioSummary.pricedPositions ? `${portfolioSummary.totalGain >= 0 ? '+' : ''}${portfolioSummary.totalGain.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}` : '-'}</strong></div>
       <div className={portfolioSummary.totalGain >= 0 ? 'positive' : 'negative'}><span>Variazione complessiva</span><strong>{portfolioSummary.totalGainPct === null ? '-' : `${portfolioSummary.totalGainPct >= 0 ? '+' : ''}${portfolioSummary.totalGainPct.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`}</strong></div>
      </div>
@@ -1421,6 +1471,7 @@ const watchlistRows = watchlist.map((t) => {
       <label>Societa<input value={portfolioForm.company} onChange={e => setPortfolioForm(prev => ({ ...prev, company: e.target.value }))} placeholder="es. Eni" /></label>
       <label>Quantita<input type="number" min="0" step="any" value={portfolioForm.quantity} onChange={e => setPortfolioForm(prev => ({ ...prev, quantity: e.target.value }))} placeholder="100" /></label>
       <label>Prezzo medio<input type="number" min="0" step="any" value={portfolioForm.entryPrice} onChange={e => setPortfolioForm(prev => ({ ...prev, entryPrice: e.target.value }))} placeholder="23.50" /></label>
+      <label>Stop loss configurato<input type="number" min="0" step="any" value={portfolioForm.configuredStopLoss} onChange={e => setPortfolioForm(prev => ({ ...prev, configuredStopLoss: e.target.value }))} placeholder="es. 21.80" /></label>
       <label>Data acquisto<input type="date" value={portfolioForm.purchaseDate} onChange={e => setPortfolioForm(prev => ({ ...prev, purchaseDate: e.target.value }))} /></label>
       <label>Commissioni<input type="number" min="0" step="any" value={portfolioForm.fees} onChange={e => setPortfolioForm(prev => ({ ...prev, fees: e.target.value }))} placeholder="0.00" /></label>
       <label className="portfolio-notes">Note<input value={portfolioForm.notes} onChange={e => setPortfolioForm(prev => ({ ...prev, notes: e.target.value }))} placeholder="Strategia, tranche, obiettivo..." /></label>
@@ -1431,16 +1482,22 @@ const watchlistRows = watchlist.map((t) => {
      </form>
      )}
      {portfolioStatus && <div className={`monitor-import-status ${portfolioStatus.type}`}>{portfolioStatus.message}</div>}
+     {portfolioPricesStatus.message && <div className={`monitor-import-status ${portfolioPricesStatus.state}`}>{portfolioPricesStatus.message}</div>}
      {portfolioImportStatus && <div className={`monitor-import-status ${portfolioImportStatus.type}`}>{portfolioImportStatus.message}</div>}
      {portfolioAnalysis?.portfolio_summary?.news_overview && <div className={`portfolio-news-overview ${String(portfolioAnalysis.portfolio_summary.news_overview.overall_sentiment || 'neutral').toLowerCase()}`}><div><span>Sentiment complessivo news</span><strong>{portfolioAnalysis.portfolio_summary.news_overview.overall_sentiment}</strong><small>Score: {portfolioAnalysis.portfolio_summary.news_overview.sentiment_score ?? 'N/D'}</small></div><p>{portfolioAnalysis.portfolio_summary.news_overview.summary}</p></div>}
 
      <div className="portfolio-table">
-      <div className="portfolio-row portfolio-head"><span>Titolo</span><span>Quantita</span><span>Prezzo carico</span><span>Prezzo attuale</span><span>Investito</span><span>Guadagno / Perdita</span><span>Data</span><span>Azioni</span></div>
+      <div className="portfolio-row portfolio-head"><span>Titolo</span><span>Quantita</span><span>Prezzo carico</span><span>Stop configurato</span><span>Prezzo attuale</span><span>Investito</span><span>Guadagno / Perdita</span><span>Data</span><span>Azioni</span></div>
       {portfolio.length === 0 ? <div className="monitor-empty">Nessuna posizione inserita.</div> : portfolio.map(position => (
        (() => {
-        const livePriceRaw = realTickerData[position.ticker]?.search_metadata?.current_market_price;
+        const freshQuote = portfolioPrices[position.ticker];
+        const displayedQuote = freshQuote || portfolioLastPrices[position.ticker];
+        const quoteIsFresh = Boolean(freshQuote);
+        const livePriceRaw = freshQuote?.price;
         const livePrice = Number(livePriceRaw);
         const hasLivePrice = Number.isFinite(livePrice) && livePrice > 0;
+        const displayedPrice = Number(displayedQuote?.price);
+        const hasDisplayedPrice = Number.isFinite(displayedPrice) && displayedPrice > 0;
         const invested = (position.quantity * position.entry_price) + (position.fees || 0);
         const marketValue = hasLivePrice ? position.quantity * livePrice : null;
         const gain = hasLivePrice ? marketValue - invested : null;
@@ -1449,6 +1506,7 @@ const watchlistRows = watchlist.map((t) => {
         const expanded = portfolioAnalysisExpandedTicker === position.ticker;
         const assessment = analysisItem?.portfolio_assessment || {};
         const plan = analysisItem?.operational_plan || {};
+        const stopReview = analysisItem?.stop_loss_review || {};
         const newsSummary = analysisItem?.news_summary || analysisItem?.sentiment_analysis || {};
         const recentNews = analysisItem?.recent_news_7d || analysisItem?.relevant_news || [];
         const olderNews = analysisItem?.older_relevant_news || [];
@@ -1461,15 +1519,16 @@ const watchlistRows = watchlist.map((t) => {
          <span><strong>{position.ticker}</strong><small>{position.company}</small>{position.notes && <em>{position.notes}</em>}</span>
         <span>{position.quantity.toLocaleString('it-IT')}</span>
         <span>{position.entry_price.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</span>
-        <span>{hasLivePrice ? livePrice.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' }) : <button className="portfolio-update-price" onClick={() => { setActiveTab('dashboard'); handleSearch(position.ticker, true); }}>Aggiorna dati</button>}</span>
+        <span className="portfolio-configured-stop"><strong>{position.configured_stop_loss == null ? '-' : position.configured_stop_loss.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</strong>{stopReview.recommendation && <small className={`stop-review-${stopReview.recommendation.toLowerCase()}`}>{stopReview.recommendation}</small>}</span>
+        <span className={!quoteIsFresh && hasDisplayedPrice ? 'portfolio-price-stale' : ''}>{hasDisplayedPrice ? <><strong>{displayedPrice.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</strong><small>{quoteIsFresh ? 'Yahoo Finance · aggiornato ora' : `Non aggiornato · ultimo Yahoo ${displayedQuote?.retrieved_at ? new Date(displayedQuote.retrieved_at).toLocaleString('it-IT') : ''}`}</small></> : <small>{portfolioPricesStatus.state === 'loading' ? 'Aggiornamento Yahoo...' : 'Non disponibile'}</small>}</span>
         <span><strong>{invested.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</strong>{position.fees > 0 && <small>incl. {position.fees.toFixed(2)} commissioni</small>}</span>
         <span className={gain === null ? 'portfolio-gain neutral' : gain >= 0 ? 'portfolio-gain positive' : 'portfolio-gain negative'}>{gain === null ? '-' : <><strong>{gain >= 0 ? '+' : ''}{gain.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</strong><small>{gainPct >= 0 ? '+' : ''}{gainPct.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</small></>}</span>
         <span>{position.purchase_date ? new Date(`${position.purchase_date}T00:00:00`).toLocaleDateString('it-IT') : '-'}</span>
          <span className="portfolio-row-actions">{analysisItem && <button className="btn-primary" onClick={() => { setPortfolioAnalysisExpandedTicker(expanded ? null : position.ticker); setPortfolioDetailTab('summary'); }}>{expanded ? 'Chiudi' : 'Apri analisi'}</button>}<button className="btn-secondary" onClick={() => editPortfolioPosition(position)}>Modifica</button><button className="btn-secondary portfolio-remove" onClick={() => removePortfolioPosition(position.ticker)}>Rimuovi</button></span>
-       </div>{analysisItem && <div className="portfolio-row-signals"><span className={`signal ${String(newsSummary.overall_sentiment || 'neutral').toLowerCase()}`}>{newsSummary.overall_sentiment || 'NEUTRAL'}</span><strong>{assessment.recommended_action || 'N/D'}</strong><span>Stop <b>{plan.stop_loss?.level ?? 'N/D'}</b></span><span>TP1 <b>{plan.take_profit_levels?.[0]?.level ?? 'N/D'}</b></span><span>Target analisti <b>{target.available ? `${target.target_price} ${target.currency || ''}` : 'N/D'}</b></span><span>Rischio <b>{assessment.risk_level || 'N/D'}</b></span></div>}
+       </div>{analysisItem && <div className="portfolio-row-signals"><span className={`signal ${String(newsSummary.overall_sentiment || 'neutral').toLowerCase()}`}>{newsSummary.overall_sentiment || 'NEUTRAL'}</span><strong>{assessment.recommended_action || 'N/D'}</strong><span>Stop impostato <b>{position.configured_stop_loss ?? 'N/D'}</b></span><span>Verifica stop <b>{stopReview.recommendation || 'N/D'}</b></span><span>Stop suggerito <b>{stopReview.suggested_level ?? plan.stop_loss?.level ?? 'N/D'}</b></span><span>TP1 <b>{plan.take_profit_levels?.[0]?.level ?? 'N/D'}</b></span><span>Target analisti <b>{target.available ? `${target.target_price} ${target.currency || ''}` : 'N/D'}</b></span><span>Rischio <b>{assessment.risk_level || 'N/D'}</b></span></div>}
        {expanded && analysisItem && <div className="portfolio-inline-analysis">
         <div className="portfolio-detail-tabs">{[['summary','Sintesi'],['news','News'],['plan','Piano operativo'],['charts','Grafici']].map(([key,label]) => <button key={key} className={portfolioDetailTab === key ? 'active' : ''} onClick={() => { setPortfolioDetailTab(key); if (key === 'charts') { setPortfolioChartTicker(position.ticker); setPortfolioIndicatorTab('operational'); } }}>{label}</button>)}</div>
-        {portfolioDetailTab === 'summary' && <div className="portfolio-summary-view"><div className="portfolio-action-hero"><span>Azione suggerita</span><strong>{assessment.recommended_action || 'N/D'}</strong><small>{assessment.priority || ''} · rischio {assessment.risk_level || 'N/D'}</small></div><div><h4>Valutazione</h4><p>{assessment.reason || 'Nessuna motivazione disponibile.'}</p><p>{assessment.position_thesis}</p></div><div className="portfolio-summary-levels"><span>Stop loss <b>{plan.stop_loss?.level ?? 'N/D'}</b></span><span>TP1 <b>{plan.take_profit_levels?.[0]?.level ?? 'N/D'}</b></span><span>TP2 <b>{plan.take_profit_levels?.[1]?.level ?? 'N/D'}</b></span><span>Target analisti <b>{target.available ? target.target_price : 'N/D'}</b></span></div></div>}
+        {portfolioDetailTab === 'summary' && <div className="portfolio-summary-view"><div className="portfolio-action-hero"><span>Azione suggerita</span><strong>{assessment.recommended_action || 'N/D'}</strong><small>{assessment.priority || ''} · rischio {assessment.risk_level || 'N/D'}</small></div><div><h4>Valutazione</h4><p>{assessment.reason || 'Nessuna motivazione disponibile.'}</p><p>{assessment.position_thesis}</p><h4>Verifica stop loss configurato</h4><p><strong>{stopReview.recommendation || 'REVIEW_REQUIRED'}</strong> — {stopReview.reason || 'Valutazione non presente nel JSON importato.'}</p>{stopReview.risk_note && <p>{stopReview.risk_note}</p>}</div><div className="portfolio-summary-levels"><span>Stop impostato <b>{position.configured_stop_loss ?? 'N/D'}</b></span><span>Stop suggerito <b>{stopReview.suggested_level ?? plan.stop_loss?.level ?? 'N/D'}</b></span><span>TP1 <b>{plan.take_profit_levels?.[0]?.level ?? 'N/D'}</b></span><span>Target analisti <b>{target.available ? target.target_price : 'N/D'}</b></span></div></div>}
         {portfolioDetailTab === 'news' && <div className="portfolio-news-view"><div><h4>{newsSummary.headline || 'Sintesi news'}</h4><p>{newsSummary.summary || 'Nessuna sintesi.'}</p><span className={`signal ${String(newsSummary.overall_sentiment || 'neutral').toLowerCase()}`}>{newsSummary.overall_sentiment || 'NEUTRAL'} · score {newsSummary.sentiment_score ?? 'N/D'}</span></div><section><h4>Ultimi 7 giorni</h4>{recentNews.length ? recentNews.map((news,index) => <a key={news.id || index} href={news.source_url || undefined} target="_blank" rel="noreferrer"><strong>{news.headline}</strong><span>{news.source} · {news.published_at ? new Date(news.published_at).toLocaleString('it-IT') : ''}</span><p>{news.summary}</p></a>) : <p>Nessuna news verificata negli ultimi 7 giorni.</p>}</section><section><h4>News storiche rilevanti</h4>{olderNews.length ? olderNews.map((news,index) => <a key={news.id || index} href={news.source_url || undefined} target="_blank" rel="noreferrer"><strong>{news.headline}</strong><span>{news.source} · {news.published_at ? new Date(news.published_at).toLocaleDateString('it-IT') : ''}</span><p>{news.ongoing_relevance || news.summary}</p></a>) : <p>Nessuna news storica selezionata.</p>}</section></div>}
         {portfolioDetailTab === 'plan' && <div className="portfolio-plan-view"><div className="portfolio-plan-kpis"><div><span>Stato</span><strong>{plan.plan_status || 'N/D'}</strong></div><div><span>Riferimento</span><strong>{plan.reference_price ?? 'N/D'}</strong></div><div className="stop"><span>Stop loss</span><strong>{plan.stop_loss?.level ?? 'N/D'}</strong><small>{plan.stop_loss?.trigger || ''}</small></div><div><span>Trailing</span><strong>{plan.trailing_stop?.enabled ? `${plan.trailing_stop.trail_pct ?? 'N/D'}%` : 'Non attivo'}</strong></div><div><span>Risk/Reward</span><strong>{plan.risk_reward?.ratio_to_tp1 ?? 'N/D'}</strong></div><div><span>Orizzonte</span><strong>{plan.time_horizon || 'N/D'}</strong></div></div><div className="portfolio-tp-grid">{(plan.take_profit_levels || []).map(tp => <div key={tp.label}><strong>{tp.label}: {tp.level}</strong><span>{tp.reason}</span></div>)}</div><div className="portfolio-plan-conditions"><div><strong>Conferme</strong>{(plan.confirmation_conditions || []).map((text,index)=><span key={index}>{text}</span>)}</div><div><strong>Invalidazione</strong>{(plan.invalidation_conditions || []).map((text,index)=><span key={index}>{text}</span>)}</div><div><strong>Monitoraggio</strong>{(plan.monitoring_triggers || []).map((text,index)=><span key={index}>{text}</span>)}</div></div></div>}
         {portfolioDetailTab === 'charts' && (() => {
@@ -1483,7 +1542,8 @@ const watchlistRows = watchlist.map((t) => {
          const levels = [
           ['Prezzo ingresso', Number(position.entry_price), '#a78bfa'],
           ['Prezzo analisi', analysisPrice, '#38bdf8'],
-          ['Stop loss', Number(plan.stop_loss?.level), '#ef4444'],
+          ['Stop configurato', Number(position.configured_stop_loss), '#fb7185'],
+          ['Stop suggerito', Number(stopReview.suggested_level ?? plan.stop_loss?.level), '#ef4444'],
           ...((plan.take_profit_levels || []).map((tp,index) => [tp.label || `TP${index + 1}`, Number(tp.level), '#22c55e'])),
           ['Supporto', Number(technical.major_support), '#f97316'],
           ['Resistenza', Number(technical.resistance), '#eab308'],
@@ -1560,7 +1620,8 @@ const watchlistRows = watchlist.map((t) => {
            const thresholdCandidates = [
             ['Prezzo ingresso', Number(item.position?.entry_price), '#a78bfa'],
             ['Prezzo analisi', getPortfolioAnalysisPrice(item), '#38bdf8'],
-            ['Stop loss', Number(stop.level), '#ef4444'],
+            ['Stop configurato', Number(item.stop_loss_review?.configured_level ?? item.position?.configured_stop_loss), '#fb7185'],
+            ['Stop suggerito', Number(item.stop_loss_review?.suggested_level ?? stop.level), '#ef4444'],
             ...((plan.take_profit_levels || []).map((tp, index) => [tp.label || `TP${index + 1}`, Number(tp.level), '#22c55e'])),
             ['Supporto', Number(technical.major_support), '#f97316'],
             ['Resistenza', Number(technical.resistance), '#eab308'],

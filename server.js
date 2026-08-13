@@ -334,6 +334,88 @@ const server = http.createServer((req, meRes) => {
     return;
   }
 
+  // API: fresh portfolio quotes fetched only from Yahoo Finance.
+  if (parsedUrl.pathname === '/api/portfolio-prices' && req.method === 'GET') {
+    const tickers = String(parsedUrl.query.tickers || '')
+      .split(',')
+      .map(item => item.trim().toUpperCase())
+      .filter((item, index, values) => item && values.indexOf(item) === index)
+      .slice(0, 100);
+    if (!tickers.length) {
+      meRes.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      meRes.end(JSON.stringify({ error: 'Nessun ticker richiesto.' }));
+      return;
+    }
+
+    const pythonCmd = `
+import json
+import sys
+from datetime import datetime, timezone
+import yfinance as yf
+
+tickers = json.loads(sys.argv[1])
+prices = {}
+errors = {}
+for ticker in tickers:
+    try:
+        instrument = yf.Ticker(ticker)
+        price = None
+        method = None
+        market_timestamp = None
+        try:
+            price = instrument.fast_info.get('lastPrice')
+            if price is not None:
+                method = 'fast_info.lastPrice'
+        except Exception:
+            pass
+        if price is None:
+            history = instrument.history(period='1d', interval='1m', actions=False, auto_adjust=False)
+            if history.empty:
+                history = instrument.history(period='5d', interval='1d', actions=False, auto_adjust=False)
+                method = 'history.daily.Close'
+            else:
+                method = 'history.1m.Close'
+            if not history.empty:
+                price = float(history['Close'].dropna().iloc[-1])
+                market_timestamp = history.index[-1].isoformat()
+        if price is None:
+            raise ValueError('Prezzo Yahoo Finance non disponibile')
+        prices[ticker] = {
+            'price': round(float(price), 4),
+            'source': 'Yahoo Finance',
+            'method': method,
+            'market_timestamp': market_timestamp,
+            'retrieved_at': datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as exc:
+        errors[ticker] = str(exc)
+
+print(json.dumps({'prices': prices, 'errors': errors, 'source': 'Yahoo Finance'}))
+    `;
+    const pyProc = spawn(PYTHON_PATH, ['-c', pythonCmd, JSON.stringify(tickers)], { shell: false, cwd: __dirname });
+    let output = '';
+    let errorOutput = '';
+    pyProc.stdout.on('data', chunk => { output += chunk.toString(); });
+    pyProc.stderr.on('data', chunk => { errorOutput += chunk.toString(); });
+    pyProc.on('error', error => {
+      if (meRes.writableEnded) return;
+      meRes.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      meRes.end(JSON.stringify({ error: error.message }));
+    });
+    pyProc.on('close', code => {
+      if (meRes.writableEnded) return;
+      try {
+        const data = JSON.parse(output.trim());
+        meRes.writeHead(code === 0 ? 200 : 502, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        meRes.end(JSON.stringify(data));
+      } catch (error) {
+        meRes.writeHead(502, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        meRes.end(JSON.stringify({ error: 'Risposta Yahoo Finance non valida.', details: errorOutput.trim() || output.trim() }));
+      }
+    });
+    return;
+  }
+
   if (parsedUrl.pathname === '/api/export-pdf/status' && req.method === 'GET') {
     const job = pdfExportJobs.get(String(parsedUrl.query.job_id || ''));
     if (!job) {
