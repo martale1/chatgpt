@@ -10,9 +10,14 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
+YFINANCE_CACHE_DIR = Path(__file__).resolve().parents[1] / "cache" / "yfinance"
+YFINANCE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+yf.set_tz_cache_location(str(YFINANCE_CACHE_DIR))
+
 
 def download_history(ticker, period="1y"):
-    df = yf.Ticker(ticker).history(period=period, actions=False, auto_adjust=False)
+    instrument = yf.Ticker(ticker)
+    df = instrument.history(period=period, interval="1d", actions=False, auto_adjust=False)
     if df is None or df.empty:
         raise RuntimeError(f"No market data found for {ticker}")
     df = df.dropna(subset=["Open", "High", "Low", "Close"]).copy()
@@ -203,9 +208,10 @@ def _save(fig, path):
     return path
 
 
-def plot_price_alligator(df, ticker, output_path, days=252, chart_type="candlestick"):
+def plot_price_alligator(df, ticker, output_path, days=252, chart_type="candlestick", extra_levels=None):
     view = df.tail(days).copy()
     x = _date_positions(view)
+    extra_levels = extra_levels or []
     fig, ax = plt.subplots(figsize=(15, 6))
     if chart_type == "candlestick":
         _plot_candles(ax, view)
@@ -305,9 +311,43 @@ def plot_price_alligator(df, ticker, output_path, days=252, chart_type="candlest
         ax.axhline(imm_lows, color="#22c55e", linestyle=":", linewidth=1.4, alpha=0.7)
         ax.text(x[-1] + 0.5, imm_lows, f"  SUPP BREVE {imm_lows:.2f}", color="#22c55e", fontweight="bold", fontsize=9, va="center")
 
+    # Livelli opzionali provenienti dall'analisi AI visuale: disegnati nel sistema nativo dell'asse Y.
+    cleaned_extra_levels = []
+    for level in extra_levels:
+        try:
+            value = float(level.get("value"))
+        except Exception:
+            continue
+        if value <= 0 or value > 5000:
+            continue
+        level_type = level.get("type", "resistance")
+        label = level.get("label") or ("AI SUP" if level_type == "support" else "AI RES")
+        cleaned_extra_levels.append({"value": value, "type": level_type, "label": label})
+
+    for idx, level in enumerate(cleaned_extra_levels):
+        is_support = level["type"] == "support"
+        color = "#16a34a" if is_support else "#dc2626"
+        linestyle = (0, (2, 2.5))
+        linewidth = 1.8
+        ax.axhline(level["value"], color=color, linestyle=linestyle, linewidth=linewidth, alpha=0.95, zorder=7)
+        ax.text(
+            0.82 if idx % 2 == 0 else 0.64,
+            level["value"],
+            f" {level['label']} {level['value']:.2f} ",
+            transform=ax.get_yaxis_transform(),
+            color=color,
+            fontsize=8.8,
+            fontweight="bold",
+            va="center",
+            ha="left",
+            bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor=color, alpha=0.92),
+            zorder=12,
+        )
+
     # Set clean Y-axis limits dynamically centered around actual price range
-    price_min = abs_lows
-    price_max = abs_highs
+    extra_values = [level["value"] for level in cleaned_extra_levels]
+    price_min = min([abs_lows] + extra_values) if extra_values else abs_lows
+    price_max = max([abs_highs] + extra_values) if extra_values else abs_highs
     y_range = max(price_max - price_min, 0.5)
     ax.set_ylim(price_min - y_range * 0.06, price_max + y_range * 0.18)
 
@@ -480,16 +520,20 @@ def latest_snapshot(df):
     }
 
 
-def create_chart_bundle(ticker, output_dir, period="1y", days=252, chart_type="candlestick"):
+def create_chart_bundle(ticker, output_dir, period="1y", days=252, chart_type="candlestick", extra_levels=None, output_suffix="", chart_kinds=None):
     output_dir = Path(output_dir)
-    df = add_indicators(download_history(ticker, period=period))
+    history = download_history(ticker, period=period)
+    df = add_indicators(history)
     safe_ticker = ticker.replace("/", "_")
-    files = [
-        plot_price_alligator(df, ticker, output_dir / f"{safe_ticker}_price_alligator.png", days, chart_type),
-        plot_volume(df, ticker, output_dir / f"{safe_ticker}_volume.png", days),
-        plot_oscillators(df, ticker, output_dir / f"{safe_ticker}_oscillators.png", days),
-        plot_macd(df, ticker, output_dir / f"{safe_ticker}_macd.png", days),
-        plot_adx_dashboard(df, ticker, output_dir / f"{safe_ticker}_adx.png", days),
-        plot_momentum_dashboard(df, ticker, output_dir / f"{safe_ticker}_momentum.png", days),
-    ]
+    file_prefix = f"{safe_ticker}_{output_suffix}" if output_suffix else safe_ticker
+    requested = set(chart_kinds or ["price_alligator", "volume", "oscillators", "macd", "adx", "momentum"])
+    generators = {
+        "price_alligator": lambda: plot_price_alligator(df, ticker, output_dir / f"{file_prefix}_price_alligator.png", days, chart_type, extra_levels),
+        "volume": lambda: plot_volume(df, ticker, output_dir / f"{file_prefix}_volume.png", days),
+        "oscillators": lambda: plot_oscillators(df, ticker, output_dir / f"{file_prefix}_oscillators.png", days),
+        "macd": lambda: plot_macd(df, ticker, output_dir / f"{file_prefix}_macd.png", days),
+        "adx": lambda: plot_adx_dashboard(df, ticker, output_dir / f"{file_prefix}_adx.png", days),
+        "momentum": lambda: plot_momentum_dashboard(df, ticker, output_dir / f"{file_prefix}_momentum.png", days),
+    }
+    files = [generators[kind]() for kind in generators if kind in requested]
     return {"ticker": ticker, "files": files, "snapshot": latest_snapshot(df)}

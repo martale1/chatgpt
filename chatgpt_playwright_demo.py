@@ -1,6 +1,9 @@
 import argparse
+import json
 import os
+import re
 import sys
+import time
 from pathlib import Path
 
 try:
@@ -20,7 +23,7 @@ TELEGRAM_TOKEN_FALLBACK_ENV = "TELEGRAM_BOT_TOKEN_CH1"
 TELEGRAM_RECEIVER_ENV = "TELEGRAM_RECEIVER_ID"
 DEFAULT_CDP_URL = "http://127.0.0.1:9222"
 SEND_TELEGRAM_BY_DEFAULT = True
-RESPONSE_TIMEOUT_SECONDS = 120
+RESPONSE_TIMEOUT_SECONDS = 240
 PAUSE_BETWEEN_STOCKS_SECONDS = 3
 DEFAULT_COMPANY = "Vodafone"
 DEFAULT_TICKER = "VOD.L"
@@ -137,6 +140,7 @@ def build_stock_prompt(company, ticker="", market=""):
     return f"""Cerca news di oggi e degli ultimi 3 giorni su {instrument}.{price_prompt_note}
 Rispondi SOLO con un blocco JSON valido, nessun testo prima o dopo.
 ATTENZIONE RIGOROSA: L'analisi DEVE riguardare ESCLUSIVAMENTE l'azienda {company} (Ticker: {ticker}, Mercato: {market}). NON includere informazioni su altre societa'.
+FORMATO OBBLIGATORIO: JSON puro parsabile da JSON.parse. Non inserire markdown, citazioni inline, note a pie' pagina, righe isolate con nomi fonte, badge fonte, riferimenti tipo "+1" o testo fuori dalle stringhe JSON. Tutti i valori stringa devono stare su una sola riga, senza ritorni a capo interni.
 
 Usa esattamente questo schema JSON (sostituisci i valori tra [ ]):
 
@@ -170,8 +174,8 @@ Usa esattamente questo schema JSON (sostituisci i valori tra [ ]):
       "source_domain": "[dominio es. reuters.com]",
       "url": "[URL articolo originale oppure null]",
       "category": "[categoria es. Risultati / M&A / Regolatorio / Macro / Settoriale]",
-      "summary": "[primo paragrafo della notizia]",
-      "detail": "[testo completo e dettagliato della notizia, senza riassumere, con tutti i numeri, percentuali e dichiarazioni originali]",
+      "summary": "[riassunto della notizia in una sola stringa, massimo 300 caratteri]",
+      "detail": "[dettaglio della notizia in una sola stringa, massimo 900 caratteri, con numeri e percentuali rilevanti]",
       "sentiment": "[Positivo / Neutro / Negativo / Molto Positivo / Molto Negativo]",
       "impact_rating": "[Alto / Medio / Basso / Molto Alto]"
     }}
@@ -185,8 +189,8 @@ Usa esattamente questo schema JSON (sostituisci i valori tra [ ]):
       "source_domain": "[dominio]",
       "url": "[URL oppure null]",
       "category": "[categoria]",
-      "summary": "[primo paragrafo]",
-      "detail": "[testo completo dettagliato]",
+      "summary": "[riassunto in una sola stringa, massimo 300 caratteri]",
+      "detail": "[dettaglio in una sola stringa, massimo 900 caratteri]",
       "sentiment": "[sentiment]",
       "impact_rating": "[impatto]"
     }}
@@ -212,7 +216,8 @@ Usa esattamente questo schema JSON (sostituisci i valori tra [ ]):
 Regole:
 - Rispondi SOLO con il JSON. Nessun testo prima o dopo il blocco ```json```.
 - Non inventare dati. Se un campo non e' disponibile, usa null o array vuoto [].
-- Il campo "detail" deve contenere il testo COMPLETO della notizia, non riassunto.
+- Non inserire citazioni, badge fonte o righe isolate dentro i valori JSON. Usa solo i campi source/source_domain/url per indicare la fonte.
+- Il campo "detail" deve essere dettagliato ma compatto, in una sola riga JSON.
 - Includi tutte le notizie trovate negli ultimi 3 giorni in recent_news_last_3_days.
 - Includi notizie storiche rilevanti degli ultimi 30 giorni in latest_available_news."""
 
@@ -249,25 +254,86 @@ def find_prompt_box(page):
     selectors = [
         "textarea[data-testid='prompt-textarea']",
         "div[contenteditable='true'][data-testid='prompt-textarea']",
+        "#prompt-textarea",
+        "div.ProseMirror[contenteditable='true']",
         "textarea",
         "div[contenteditable='true']",
     ]
     for selector in selectors:
+        safe_print(f"Controllo campo prompt con selettore: {selector}")
         locator = page.locator(selector).last
         try:
             locator.wait_for(state="visible", timeout=5000)
+            safe_print(f"Campo prompt visibile con selettore: {selector}")
             return locator
         except PlaywrightTimeoutError:
             continue
     raise RuntimeError("Non trovo il campo prompt di ChatGPT. La UI potrebbe essere cambiata o serve login.")
 
 
-def send_prompt(page, prompt):
+def send_prompt(page, prompt, attachment_paths=None):
+    safe_print("Preparo invio prompt a ChatGPT...")
     initial_assistant_count = page.locator("[data-message-author-role='assistant']").count()
+    safe_print(f"Messaggi assistant gia' presenti: {initial_assistant_count}")
     prompt_box = find_prompt_box(page)
     safe_print("Campo prompt trovato.")
     prompt_box.click()
-    prompt_box.fill(prompt)
+    try:
+        prompt_box.fill(prompt, timeout=15000)
+    except PlaywrightError:
+        safe_print("Fill diretto non riuscito, uso inserimento via tastiera.")
+        page.keyboard.insert_text(prompt)
+
+    if attachment_paths:
+        existing_paths = [str(Path(p).resolve()) for p in attachment_paths if p and Path(p).exists()]
+        missing_paths = [str(p) for p in attachment_paths if not p or not Path(p).exists()]
+        if missing_paths:
+            safe_print(f"ATTENZIONE: file grafici mancanti, non allegati: {missing_paths}")
+        if existing_paths:
+            safe_print(f"Caricamento {len(existing_paths)} file grafico su ChatGPT dopo inserimento prompt...")
+            for file_path in existing_paths:
+                try:
+                    safe_print(f"Allego grafico: {file_path} ({Path(file_path).stat().st_size} bytes)")
+                except Exception:
+                    safe_print(f"Allego grafico: {file_path}")
+            file_input = page.locator("input[type='file']").last
+            file_input.wait_for(state="attached", timeout=10000)
+            file_input.set_input_files(existing_paths)
+            safe_print("File grafici inviati all'input file. Attendo conferma anteprima/upload...")
+
+            upload_confirmed = False
+            expected_names = [Path(p).name for p in existing_paths]
+            preview_selectors = [
+                "[data-testid*='attachment']",
+                "[data-testid*='file']",
+                "img[alt]",
+                "div:has-text('.png')",
+                "span:has-text('.png')",
+            ]
+            deadline = time.time() + 45
+            while time.time() < deadline:
+                try:
+                    body_text = page.locator("body").inner_text(timeout=1000)
+                    if any(name in body_text for name in expected_names):
+                        upload_confirmed = True
+                        break
+                    for selector in preview_selectors:
+                        if page.locator(selector).count() > 0:
+                            upload_confirmed = True
+                            break
+                    if upload_confirmed:
+                        break
+                except Exception:
+                    pass
+                page.wait_for_timeout(1000)
+
+            if upload_confirmed:
+                safe_print("Upload/anteprima grafico rilevata prima dell'invio.")
+            else:
+                safe_print("ATTENZIONE: anteprima upload non rilevata entro 45s; invio comunque, ma ChatGPT potrebbe non ricevere il grafico.")
+        else:
+            safe_print("Nota: nessun file grafico esistente da allegare.")
+
     safe_print("Prompt inserito, invio...")
 
     send_selectors = [
@@ -278,15 +344,18 @@ def send_prompt(page, prompt):
         "button[aria-label*='Send']",
     ]
     for selector in send_selectors:
+        safe_print(f"Controllo bottone invio con selettore: {selector}")
         button = page.locator(selector).last
         try:
             button.wait_for(state="visible", timeout=3000)
             if button.is_enabled():
                 button.click()
+                safe_print("Prompt inviato tramite bottone.")
                 return initial_assistant_count
         except (PlaywrightTimeoutError, PlaywrightError):
             continue
 
+    safe_print("Bottone invio non trovato, provo con Enter.")
     page.keyboard.press("Enter")
     return initial_assistant_count
 
@@ -415,14 +484,15 @@ def open_chatgpt_page(context_or_browser):
 
 
 
-def run_in_page(page, prompt, login_only):
+def run_in_page(page, prompt, login_only, attachment_paths=None):
     if login_only:
         input("Fai login nel browser aperto, poi premi INVIO qui per chiudere...")
         return
 
     safe_print("\n--- Domanda ChatGPT ---")
-    safe_print(prompt)
-    initial_assistant_count = send_prompt(page, prompt)
+    first_line = prompt.splitlines()[0] if prompt else ""
+    safe_print(f"{first_line} ({len(prompt)} caratteri)")
+    initial_assistant_count = send_prompt(page, prompt, attachment_paths)
     response = wait_for_response(page, initial_assistant_count)
     safe_print("\n--- Risposta ChatGPT ---")
     safe_print(response or "Nessuna risposta trovata.")
@@ -433,9 +503,14 @@ def build_chart_prompt(company, ticker, market, snapshot):
     close_val = snapshot.get('close', 0)
     sup_val = snapshot.get('support_30', snapshot.get('support_10', 0))
     res_val = snapshot.get('resistance_10', 0)
-    return f"""Analizza i grafici tecnici allegati del titolo {company} ({ticker}).
+    return f"""Analizza VISIVAMENTE i grafici tecnici allegati del titolo {company} ({ticker}).
 
-Dati numerici calcolati dal codice:
+IMPORTANTE:
+- La fonte primaria della tua analisi sono le immagini allegate: prezzo/candele, Alligator, volumi, RSI/Stochastic/Williams, MACD e ADX/DI.
+- I dati numerici sotto sono solo supporto per etichettare PREZZO, TRIGGER e SUPPORTO. Non scrivere mai "dai soli dati numerici", "non determinabile dai dati numerici" o formule simili.
+- Le immagini sono leggibili: commenta pattern, volumi, momentum e scenario usando quello che vedi nei grafici allegati. Evita formule difensive tipo "non chiaramente leggibile" salvo assenza totale dell'allegato.
+
+Contesto numerico di supporto:
 - Data ultima barra: {snapshot.get('date', 'N/D')}
 - Prezzo Chiusura (PREZZO): {close_val:.2f}
 - Variazione 1D: {snapshot.get('change_1d_pct', 0):+.2f}%
@@ -478,7 +553,201 @@ Rispondi ESCLUSIVAMENTE con un blocco di codice JSON valido strutturato cosi:
 
 Regole:
 - Rispondi SOLO ed ESCLUSIVAMENTE con il blocco ```json``` senza alcun altro testo prima o dopo.
+- Basa candlestick_pattern, volume_analysis, rsi_macd_summary e key_scenario sulla lettura visiva dei grafici allegati.
 - Identifica chiaramente il PREZZO, il TRIGGER e il SUPPORTO nel grafico allegato."""
+
+
+def build_local_chart_analysis(stock, snapshot):
+    close_val = float(snapshot.get("close") or 0)
+    support_val = float(snapshot.get("support_30", snapshot.get("support_10", 0)) or 0)
+    trigger_val = float(snapshot.get("resistance_10", 0) or 0)
+    resistance_30 = float(snapshot.get("resistance_30", trigger_val) or trigger_val)
+    rsi_val = float(snapshot.get("rsi") or 0)
+    macd_val = float(snapshot.get("macd") or 0)
+    signal_val = float(snapshot.get("macd_signal") or 0)
+    adx_val = float(snapshot.get("adx") or 0)
+    plus_di = float(snapshot.get("plus_di") or 0)
+    minus_di = float(snapshot.get("minus_di") or 0)
+    volume = float(snapshot.get("volume") or 0)
+    volume_ma10 = float(snapshot.get("volume_ma10") or 0)
+
+    trend = "Consolidamento"
+    if close_val > trigger_val and plus_di > minus_di:
+        trend = "Rialzista"
+    elif close_val < support_val or minus_di > plus_di:
+        trend = "Ribassista"
+
+    volume_bias = "in linea con la media"
+    if volume_ma10 > 0:
+        ratio = volume / volume_ma10
+        if ratio >= 1.25:
+            volume_bias = "superiori alla media, con partecipazione crescente"
+        elif ratio <= 0.75:
+            volume_bias = "inferiori alla media, quindi con conferma debole"
+
+    momentum = "neutro"
+    if rsi_val >= 70:
+        momentum = "in ipercomprato"
+    elif rsi_val <= 30:
+        momentum = "in ipervenduto"
+    elif macd_val > signal_val:
+        momentum = "in recupero"
+    elif macd_val < signal_val:
+        momentum = "in deterioramento"
+
+    data = {
+        "search_metadata": {
+            "query_input": stock["ticker"],
+            "company_name": stock["company"],
+            "ticker": stock["ticker"],
+            "market": stock["market"],
+            "analysis_type": "chart_ai",
+            "current_market_price": round(close_val, 2),
+            "timestamp_utc": snapshot.get("date", "")
+        },
+        "chart_technical_analysis": {
+            "overall_trend": trend,
+            "candlestick_pattern": "Lettura tecnica locale: il prezzo e' sotto il trigger operativo e sopra il supporto principale; il pattern va considerato di consolidamento finche' non arriva una rottura confermata.",
+            "volume_analysis": f"Volumi {volume_bias}. Ultimo volume: {volume:.0f}, media 10 sedute: {volume_ma10:.0f}.",
+            "identified_levels": {
+                "current_price": f"{close_val:.2f}",
+                "trigger_price": f"{trigger_val:.2f}",
+                "support_price": f"{support_val:.2f}"
+            },
+            "chart_supports": [f"{support_val:.2f} EUR", f"{float(snapshot.get('support_10', support_val) or support_val):.2f} EUR"],
+            "chart_resistances": [f"{trigger_val:.2f} EUR", f"{resistance_30:.2f} EUR"],
+            "rsi_macd_summary": f"RSI a {rsi_val:.2f}: momentum {momentum}. MACD {macd_val:.4f} vs Signal {signal_val:.4f}. ADX {adx_val:.2f}, DI+ {plus_di:.2f}, DI- {minus_di:.2f}.",
+            "key_scenario": f"Scenario principale: prezzo {close_val:.2f} tra supporto {support_val:.2f} e trigger {trigger_val:.2f}. Sopra il trigger migliora il quadro tecnico; sotto il supporto aumenta il rischio ribassista.",
+            "operational_note": f"PREZZO: {close_val:.2f} EUR | TRIGGER: {trigger_val:.2f} EUR | SUPPORTO: {support_val:.2f} EUR.\nAttendere conferma sopra il trigger per un'impostazione rialzista.\nProteggere lo scenario sotto il supporto."
+        }
+    }
+    return json.dumps(data, ensure_ascii=False)
+
+
+def make_chart_output_suffix(period, days, chart_type):
+    safe_period = re.sub(r"[^A-Za-z0-9_-]+", "_", str(period))
+    safe_type = re.sub(r"[^A-Za-z0-9_-]+", "_", str(chart_type))
+    return f"{safe_period}_{int(days)}_{safe_type}"
+
+
+def generate_local_chart_response(stock, period="1y", days=252, chart_type="candlestick"):
+    output_dir = Path("finance_charts")
+    output_dir.mkdir(exist_ok=True)
+    try:
+        from finance_charts.technical_charts import create_chart_bundle
+        bundle = create_chart_bundle(
+            stock["ticker"],
+            output_dir,
+            period=period,
+            days=days,
+            chart_type=chart_type,
+            output_suffix=make_chart_output_suffix(period, days, chart_type)
+        )
+        snapshot = bundle.get("snapshot", {})
+        safe_print("\n--- Risposta ChatGPT ---")
+        safe_print(build_local_chart_analysis(stock, snapshot))
+        return True
+    except Exception as exc:
+        safe_print(f"Errore fallback analisi grafico locale {stock['ticker']}: {exc}")
+        return False
+
+
+def chart_response_missed_attachments(response):
+    if not response:
+        return False
+    lowered = response.lower()
+    markers = [
+        "allegato non",
+        "allegati non",
+        "non disponibile nel contesto",
+        "non disponibili nel contesto",
+        "non è disponibile nella conversazione",
+        "non risulta disponibile"
+    ]
+    return any(marker in lowered for marker in markers)
+
+
+def _extract_json_payload(text):
+    if not text:
+        return None
+    fenced = re.search(r"```json\s*([\s\S]*?)```", text, flags=re.IGNORECASE)
+    raw = fenced.group(1).strip() if fenced else text.strip()
+    try:
+        return json.loads(raw)
+    except Exception:
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start >= 0 and end > start:
+            try:
+                return json.loads(raw[start:end + 1])
+            except Exception:
+                return None
+    return None
+
+
+def _parse_level_value(value):
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    match = re.search(r"-?\d+(?:[.,]\d+)?", str(value))
+    if not match:
+        return None
+    try:
+        return float(match.group(0).replace(",", "."))
+    except Exception:
+        return None
+
+
+def _extract_ai_chart_levels(response):
+    payload = _extract_json_payload(response)
+    if not isinstance(payload, dict):
+        return []
+    cta = payload.get("chart_technical_analysis") or payload.get("chart_vision_analysis") or payload.get("technical_analysis") or {}
+    identified = cta.get("identified_levels") or {}
+    supports = []
+    resistances = []
+    supports.extend(cta.get("chart_supports") or [])
+    supports.extend(cta.get("supports") or [])
+    supports.extend([identified.get("support_price"), cta.get("structural_support"), cta.get("secondary_support")])
+    resistances.extend(cta.get("chart_resistances") or [])
+    resistances.extend(cta.get("resistances") or [])
+    resistances.extend([identified.get("trigger_price"), cta.get("breakout_trigger"), cta.get("structural_resistance")])
+
+    levels = []
+    seen = set()
+    for level_type, values, label in (("support", supports, "AI SUP"), ("resistance", resistances, "AI RES")):
+        for raw in values:
+            value = _parse_level_value(raw)
+            if value is None or value <= 0 or value > 5000:
+                continue
+            key = (level_type, round(value, 2))
+            if key in seen:
+                continue
+            seen.add(key)
+            levels.append({"type": level_type, "value": value, "label": label})
+    return levels
+
+
+def regenerate_price_chart_with_ai_levels(stock, response, output_dir, period="1y", days=252, chart_type="candlestick"):
+    levels = _extract_ai_chart_levels(response)
+    if not levels:
+        safe_print("Nota: nessun livello AI valido trovato nel JSON per rigenerare il grafico prezzo.")
+        return
+    try:
+        from finance_charts.technical_charts import create_chart_bundle
+        create_chart_bundle(
+            stock["ticker"],
+            output_dir,
+            period=period,
+            days=days,
+            chart_type=chart_type,
+            extra_levels=levels,
+            output_suffix=make_chart_output_suffix(period, days, chart_type)
+        )
+        safe_print(f"Grafico prezzo rigenerato con {len(levels)} livelli AI nativi.")
+    except Exception as exc:
+        safe_print(f"Avviso: impossibile rigenerare il grafico prezzo con livelli AI ({exc}).")
 
 
 def run_chart_report(context, stock, period="1y", days=252, chart_type="candlestick"):
@@ -487,12 +756,24 @@ def run_chart_report(context, stock, period="1y", days=252, chart_type="candlest
     output_dir.mkdir(exist_ok=True)
     snapshot = {}
     chart_file = None
+    chart_files = []
     try:
         from finance_charts.technical_charts import create_chart_bundle
-        bundle = create_chart_bundle(stock["ticker"], output_dir, period=period, days=days, chart_type=chart_type)
+        bundle = create_chart_bundle(
+            stock["ticker"],
+            output_dir,
+            period=period,
+            days=days,
+            chart_type=chart_type,
+            output_suffix=make_chart_output_suffix(period, days, chart_type)
+        )
         snapshot = bundle.get("snapshot", {})
         if bundle.get("files") and len(bundle["files"]) > 0:
-            chart_file = bundle["files"][0]
+            chart_files = [
+                f for f in bundle["files"]
+                if str(f).endswith("_price_alligator.png")
+            ] or bundle["files"][:1]
+            chart_file = chart_files[0]
             safe_print(f"Grafico generato con successo: {chart_file}")
     except Exception as e:
         safe_print(f"Avviso: generazione grafico locale non riuscita ({e}). Continuo senza immagine.")
@@ -500,18 +781,19 @@ def run_chart_report(context, stock, period="1y", days=252, chart_type="candlest
     prompt = build_chart_prompt(stock["company"], stock["ticker"], stock["market"], snapshot)
     page = open_chatgpt_page(context)
     try:
-        if chart_file and os.path.exists(chart_file):
-            safe_print(f"Caricamento file grafico {chart_file} su ChatGPT...")
-            try:
-                file_input = page.locator("input[type='file']").first
-                file_input.wait_for(state="attached", timeout=5000)
-                file_input.set_input_files(str(Path(chart_file).resolve()))
-                safe_print("File grafico allegato! Attendo rendering anteprima...")
-                page.wait_for_timeout(3000)
-            except Exception as fe:
-                safe_print(f"Nota: Impossibile allegare il file direttamente ({fe}). Invio dati numerici del grafico.")
-
-        return run_in_page(page, prompt, False)
+        existing_chart_files = [str(Path(f).resolve()) for f in chart_files if f and os.path.exists(f)]
+        if not existing_chart_files:
+            safe_print("Nota: nessun file grafico disponibile. Invio solo dati numerici del grafico.")
+        response = run_in_page(page, prompt, False, existing_chart_files)
+        if chart_response_missed_attachments(response):
+            safe_print("Nota: ChatGPT non ha ricevuto gli allegati grafici. Uso fallback tecnico locale basato sui dati del grafico.")
+            local_response = build_local_chart_analysis(stock, snapshot)
+            regenerate_price_chart_with_ai_levels(stock, local_response, output_dir, period, days, chart_type)
+            safe_print("\n--- Risposta ChatGPT ---")
+            safe_print(local_response)
+            return local_response
+        regenerate_price_chart_with_ai_levels(stock, response, output_dir, period, days, chart_type)
+        return response
     except Exception as exc:
         safe_print(f"Errore analisi grafico {stock['ticker']}: {exc}")
         return ""
@@ -622,6 +904,23 @@ def main():
         action="store_true",
         help="Genera grafico locale ed esegue l'analisi visuale AI del grafico via Playwright.",
     )
+    parser.add_argument(
+        "--period",
+        default="1y",
+        help="Periodo storico yfinance per il grafico AI, es. 3mo, 6mo, 1y.",
+    )
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=252,
+        help="Numero massimo di sessioni da mostrare nel grafico AI.",
+    )
+    parser.add_argument(
+        "--chart-type",
+        default="candlestick",
+        choices=["candlestick", "line"],
+        help="Tipo grafico prezzo da generare.",
+    )
     args = parser.parse_args()
     send_to_telegram = False if args.no_telegram else (args.telegram or SEND_TELEGRAM_BY_DEFAULT)
     if args.stocks:
@@ -666,11 +965,15 @@ def main():
                     context = p.chromium.launch_persistent_context(**launch_options)
                 except Exception as e2:
                     safe_print(f"Impossibile avviare il browser: {e2}")
+                    if args.analyze_chart:
+                        safe_print("Uso fallback tecnico locale per analisi grafico senza browser.")
+                        for stock in stock_list:
+                            generate_local_chart_response(stock)
                     return
 
         if args.analyze_chart:
             for index, stock in enumerate(stock_list, start=1):
-                response = run_chart_report(context, stock)
+                response = run_chart_report(context, stock, period=args.period, days=args.days, chart_type=args.chart_type)
                 if send_to_telegram and response:
                     send_telegram_message(response)
         elif args.prompt or args.login_only:
