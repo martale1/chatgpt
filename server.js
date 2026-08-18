@@ -554,6 +554,7 @@ function loadWatchlists() {
 
 const PORTFOLIO_STORE_FILE = path.join(__dirname, 'output', 'user_portfolio.json');
 const PORTFOLIO_ANALYSIS_FILE = path.join(__dirname, 'output', 'user_portfolio_analysis.json');
+const MONITOR_CONFIG_FILE = path.join(__dirname, 'output', 'user_monitor_config.json');
 
 function saveUserPortfolio(data) {
   try {
@@ -589,6 +590,25 @@ function loadUserPortfolioAnalysis() {
   return null;
 }
 
+function saveUserMonitorConfig(data) {
+  try {
+    const dir = path.dirname(MONITOR_CONFIG_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    if (!data) {
+      if (fs.existsSync(MONITOR_CONFIG_FILE)) fs.unlinkSync(MONITOR_CONFIG_FILE);
+      return;
+    }
+    fs.writeFileSync(MONITOR_CONFIG_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (e) {}
+}
+
+function loadUserMonitorConfig() {
+  if (fs.existsSync(MONITOR_CONFIG_FILE)) {
+    try { return JSON.parse(fs.readFileSync(MONITOR_CONFIG_FILE, 'utf8')); } catch (e) {}
+  }
+  return null;
+}
+
 
 // Create HTTP server
 const server = http.createServer((req, meRes) => {
@@ -605,7 +625,7 @@ const server = http.createServer((req, meRes) => {
     return;
   }
 
-  // API: Get all server-persisted data (analyses, watchlists, portfolio, portfolioAnalysis)
+  // API: Get all server-persisted data (analyses, watchlists, portfolio, portfolioAnalysis, monitorConfig, automation)
   if (parsedUrl.pathname === '/api/all-data' && req.method === 'GET') {
     meRes.writeHead(200, {
       'Content-Type': 'application/json',
@@ -615,11 +635,22 @@ const server = http.createServer((req, meRes) => {
     const watchlists = loadWatchlists();
     const portfolio = loadUserPortfolio();
     const portfolioAnalysis = loadUserPortfolioAnalysis();
+    const monitorConfig = loadUserMonitorConfig();
+
+    const readCacheJson = fileName => {
+      const filePath = path.join(CACHE_DIR, fileName);
+      if (!fs.existsSync(filePath)) return null;
+      try { return JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch { return null; }
+    };
+
     meRes.end(JSON.stringify({
       tickerData: analyses,
       watchlists: watchlists,
       portfolio: portfolio,
-      portfolioAnalysis: portfolioAnalysis
+      portfolioAnalysis: portfolioAnalysis,
+      monitorConfig: monitorConfig,
+      automationReport: readCacheJson('ftse_mib_news_scout.json'),
+      automationStrategies: readCacheJson('ftse_mib_candidate_strategies.json')
     }));
     return;
   }
@@ -632,6 +663,46 @@ const server = http.createServer((req, meRes) => {
       try {
         const parsed = JSON.parse(body);
         saveWatchlists(parsed);
+        meRes.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        meRes.end(JSON.stringify({ status: 'ok' }));
+      } catch (e) {
+        meRes.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        meRes.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // API: Save ticker data dictionary to server disk
+  if (parsedUrl.pathname === '/api/save-ticker-data' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const parsed = JSON.parse(body || '{}');
+        if (parsed && typeof parsed === 'object') {
+          for (const [t, d] of Object.entries(parsed)) {
+            if (t && d) saveTickerAnalysis(t, d);
+          }
+        }
+        meRes.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        meRes.end(JSON.stringify({ status: 'ok' }));
+      } catch (e) {
+        meRes.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        meRes.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // API: Save monitor config to server disk
+  if (parsedUrl.pathname === '/api/save-monitor-config' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const parsed = JSON.parse(body || 'null');
+        saveUserMonitorConfig(parsed);
         meRes.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
         meRes.end(JSON.stringify({ status: 'ok' }));
       } catch (e) {

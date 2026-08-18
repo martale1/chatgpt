@@ -417,18 +417,29 @@ export default function App() {
   setPdfProgress(null);
  }, [activeWatchlistName]);
 
- // Sincronizzazione con Server Backend (per la persistenza multi-browser) 
+ // Sincronizzazione con Server Backend (per la persistenza multi-browser totale) 
  useEffect(() => {
   fetch('/api/all-data')
    .then(res => res.json())
    .then(resData => {
+    if (resData.tickerData && typeof resData.tickerData === 'object') {
      setRealTickerData(prev => {
       const merged = { ...prev, ...resData.tickerData };
       localStorage.setItem('real_ticker_data', JSON.stringify(merged));
       return merged;
      });
+    }
     if (resData.watchlists && typeof resData.watchlists === 'object' && Object.keys(resData.watchlists).length > 0) {
      setWatchlists(resData.watchlists);
+    }
+    if (resData.monitorConfig && typeof resData.monitorConfig === 'object') {
+     setMonitorConfig(resData.monitorConfig);
+    }
+    if (resData.automationReport) {
+     setAutomationReport(resData.automationReport);
+    }
+    if (resData.automationStrategies) {
+     setAutomationStrategies(resData.automationStrategies);
     }
 
     const localPortfolioRaw = localStorage.getItem('investment_portfolio');
@@ -575,11 +586,25 @@ export default function App() {
 
  useEffect(() => {
   localStorage.setItem('real_ticker_data', JSON.stringify(realTickerData));
+  try {
+   fetch('/api/save-ticker-data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(realTickerData)
+   }).catch(() => {});
+  } catch (e) {}
  }, [realTickerData]);
 
  useEffect(() => {
   if (monitorConfig) localStorage.setItem('ftse_mib_monitor_config', JSON.stringify(monitorConfig));
   else localStorage.removeItem('ftse_mib_monitor_config');
+  try {
+   fetch('/api/save-monitor-config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(monitorConfig)
+   }).catch(() => {});
+  } catch (e) {}
  }, [monitorConfig]);
 
  useEffect(() => {
