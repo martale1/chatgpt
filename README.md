@@ -129,6 +129,7 @@ chatgpt/
 ├── finance_tools/               # Moduli e utilities per portafoglio, notizie e scanner MIB30
 ├── portfolio.json               # File di stato e storico del portafoglio monitorato
 ├── portfolio.example.json       # Template di esempio per la struttura del portafoglio
+├── start_app.bat                # Script batch per avviare ambiente Conda, Backend Node e Frontend React
 ├── open_chrome_for_chatgpt.bat  # Script batch per avviare Chrome con porta di debug CDP (9222)
 ├── requirements.txt             # Dipendenze Python complete del progetto
 ├── README.md                    # Documentazione di sistema e architettura
@@ -170,7 +171,19 @@ cd frontend
 npm install
 ```
 
-### 4. Avvio Server Backend e Dashboard
+### 4. Avvio Rapido (Consigliato)
+
+Esegui semplicemente lo script batch **`start_app.bat`** (oppure fai doppio clic su di esso):
+
+```cmd
+start_app.bat
+```
+
+Questo avviarià automaticamente l'ambiente Conda (`openaiAgent`) e aprirà due finestre PowerShell dedicate per il **Backend Node.js** (`http://localhost:3001`) e il **Frontend React** (`http://localhost:5173`).
+
+---
+
+### 5. Avvio Manuale (Alternativo)
 
 In un primo terminale (Backend Node.js):
 ```bash
@@ -184,3 +197,4 @@ npm run dev
 ```
 
 Apri `http://localhost:5173/` nel browser per accedere alla dashboard completa!
+
