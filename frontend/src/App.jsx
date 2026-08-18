@@ -422,7 +422,6 @@ export default function App() {
   fetch('/api/all-data')
    .then(res => res.json())
    .then(resData => {
-     // Conserva i dati ricevuti dal backend senza forzare l'apertura automatica di alcuna scheda
      setRealTickerData(prev => {
       const merged = { ...prev, ...resData.tickerData };
       localStorage.setItem('real_ticker_data', JSON.stringify(merged));
@@ -430,6 +429,12 @@ export default function App() {
      });
     if (resData.watchlists && typeof resData.watchlists === 'object' && Object.keys(resData.watchlists).length > 0) {
      setWatchlists(resData.watchlists);
+    }
+    if (Array.isArray(resData.portfolio) && resData.portfolio.length > 0) {
+     setPortfolio(resData.portfolio);
+    }
+    if (resData.portfolioAnalysis && typeof resData.portfolioAnalysis === 'object') {
+     setPortfolioAnalysis(resData.portfolioAnalysis);
     }
    })
   .catch(() => {});
@@ -555,6 +560,13 @@ export default function App() {
 
  useEffect(() => {
   localStorage.setItem('investment_portfolio', JSON.stringify(portfolio));
+  try {
+   fetch('/api/save-portfolio', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(portfolio)
+   }).catch(() => {});
+  } catch (e) {}
  }, [portfolio]);
 
  useEffect(() => {
@@ -596,6 +608,13 @@ export default function App() {
  useEffect(() => {
   if (portfolioAnalysis) localStorage.setItem('portfolio_analysis_output', JSON.stringify(portfolioAnalysis));
   else localStorage.removeItem('portfolio_analysis_output');
+  try {
+   fetch('/api/save-portfolio-analysis', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(portfolioAnalysis)
+   }).catch(() => {});
+  } catch (e) {}
  }, [portfolioAnalysis]);
 
  useEffect(() => {

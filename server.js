@@ -552,6 +552,43 @@ function loadWatchlists() {
   return normalizeWatchlists(null);
 }
 
+const PORTFOLIO_STORE_FILE = path.join(__dirname, 'output', 'user_portfolio.json');
+const PORTFOLIO_ANALYSIS_FILE = path.join(__dirname, 'output', 'user_portfolio_analysis.json');
+
+function saveUserPortfolio(data) {
+  try {
+    const dir = path.dirname(PORTFOLIO_STORE_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(PORTFOLIO_STORE_FILE, JSON.stringify(Array.isArray(data) ? data : [], null, 2), 'utf8');
+  } catch (e) {}
+}
+
+function loadUserPortfolio() {
+  if (fs.existsSync(PORTFOLIO_STORE_FILE)) {
+    try { return JSON.parse(fs.readFileSync(PORTFOLIO_STORE_FILE, 'utf8')); } catch (e) {}
+  }
+  return [];
+}
+
+function saveUserPortfolioAnalysis(data) {
+  try {
+    const dir = path.dirname(PORTFOLIO_ANALYSIS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    if (!data) {
+      if (fs.existsSync(PORTFOLIO_ANALYSIS_FILE)) fs.unlinkSync(PORTFOLIO_ANALYSIS_FILE);
+      return;
+    }
+    fs.writeFileSync(PORTFOLIO_ANALYSIS_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (e) {}
+}
+
+function loadUserPortfolioAnalysis() {
+  if (fs.existsSync(PORTFOLIO_ANALYSIS_FILE)) {
+    try { return JSON.parse(fs.readFileSync(PORTFOLIO_ANALYSIS_FILE, 'utf8')); } catch (e) {}
+  }
+  return null;
+}
+
 
 // Create HTTP server
 const server = http.createServer((req, meRes) => {
@@ -568,7 +605,7 @@ const server = http.createServer((req, meRes) => {
     return;
   }
 
-  // API: Get all server-persisted data (analyses & watchlists)
+  // API: Get all server-persisted data (analyses, watchlists, portfolio, portfolioAnalysis)
   if (parsedUrl.pathname === '/api/all-data' && req.method === 'GET') {
     meRes.writeHead(200, {
       'Content-Type': 'application/json',
@@ -576,7 +613,14 @@ const server = http.createServer((req, meRes) => {
     });
     const analyses = loadAllTickerAnalyses();
     const watchlists = loadWatchlists();
-    meRes.end(JSON.stringify({ tickerData: analyses, watchlists: watchlists }));
+    const portfolio = loadUserPortfolio();
+    const portfolioAnalysis = loadUserPortfolioAnalysis();
+    meRes.end(JSON.stringify({
+      tickerData: analyses,
+      watchlists: watchlists,
+      portfolio: portfolio,
+      portfolioAnalysis: portfolioAnalysis
+    }));
     return;
   }
 
@@ -588,16 +632,46 @@ const server = http.createServer((req, meRes) => {
       try {
         const parsed = JSON.parse(body);
         saveWatchlists(parsed);
-        meRes.writeHead(200, {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        });
+        meRes.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
         meRes.end(JSON.stringify({ status: 'ok' }));
       } catch (e) {
-        meRes.writeHead(400, {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        });
+        meRes.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        meRes.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // API: Save portfolio to server disk
+  if (parsedUrl.pathname === '/api/save-portfolio' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const parsed = JSON.parse(body || '[]');
+        saveUserPortfolio(parsed);
+        meRes.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        meRes.end(JSON.stringify({ status: 'ok' }));
+      } catch (e) {
+        meRes.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        meRes.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // API: Save portfolio analysis output to server disk
+  if (parsedUrl.pathname === '/api/save-portfolio-analysis' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const parsed = JSON.parse(body || 'null');
+        saveUserPortfolioAnalysis(parsed);
+        meRes.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        meRes.end(JSON.stringify({ status: 'ok' }));
+      } catch (e) {
+        meRes.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
         meRes.end(JSON.stringify({ error: e.message }));
       }
     });
