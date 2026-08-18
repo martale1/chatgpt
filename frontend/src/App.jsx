@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 // Nessun dato simulato o inventato: i dati vengono SEMPRE da ChatGPT via Playwright 
 
@@ -250,7 +250,7 @@ function EmptyState({ ticker, onAnalyze, loading }) {
 }
 
 export default function App() {
-
+ const isInitialServerDataLoaded = useRef(false);
  const [query, setQuery] = useState('');
  const [data, setData] = useState(null);
  const [loading, setLoading] = useState(false);
@@ -471,8 +471,12 @@ export default function App() {
       body: JSON.stringify(localAnalysis)
      }).catch(() => {});
     }
+
+    isInitialServerDataLoaded.current = true;
    })
-  .catch(() => {});
+  .catch(() => {
+   isInitialServerDataLoaded.current = true;
+  });
  }, []);
 
  useEffect(() => {
@@ -586,6 +590,7 @@ export default function App() {
 
  useEffect(() => {
   localStorage.setItem('real_ticker_data', JSON.stringify(realTickerData));
+  if (!isInitialServerDataLoaded.current) return;
   try {
    fetch('/api/save-ticker-data', {
     method: 'POST',
@@ -598,6 +603,7 @@ export default function App() {
  useEffect(() => {
   if (monitorConfig) localStorage.setItem('ftse_mib_monitor_config', JSON.stringify(monitorConfig));
   else localStorage.removeItem('ftse_mib_monitor_config');
+  if (!isInitialServerDataLoaded.current) return;
   try {
    fetch('/api/save-monitor-config', {
     method: 'POST',
@@ -609,6 +615,7 @@ export default function App() {
 
  useEffect(() => {
   localStorage.setItem('investment_portfolio', JSON.stringify(portfolio));
+  if (!isInitialServerDataLoaded.current) return;
   try {
    fetch('/api/save-portfolio', {
     method: 'POST',
