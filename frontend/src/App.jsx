@@ -430,11 +430,35 @@ export default function App() {
     if (resData.watchlists && typeof resData.watchlists === 'object' && Object.keys(resData.watchlists).length > 0) {
      setWatchlists(resData.watchlists);
     }
+
+    const localPortfolioRaw = localStorage.getItem('investment_portfolio');
+    let localPortfolio = [];
+    try { localPortfolio = localPortfolioRaw ? JSON.parse(localPortfolioRaw) : []; } catch {}
+
     if (Array.isArray(resData.portfolio) && resData.portfolio.length > 0) {
      setPortfolio(resData.portfolio);
+     localStorage.setItem('investment_portfolio', JSON.stringify(resData.portfolio));
+    } else if (localPortfolio.length > 0) {
+     fetch('/api/save-portfolio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(localPortfolio)
+     }).catch(() => {});
     }
-    if (resData.portfolioAnalysis && typeof resData.portfolioAnalysis === 'object') {
+
+    const localAnalysisRaw = localStorage.getItem('portfolio_analysis_output');
+    let localAnalysis = null;
+    try { localAnalysis = localAnalysisRaw ? JSON.parse(localAnalysisRaw) : null; } catch {}
+
+    if (resData.portfolioAnalysis && typeof resData.portfolioAnalysis === 'object' && Array.isArray(resData.portfolioAnalysis.securities)) {
      setPortfolioAnalysis(resData.portfolioAnalysis);
+     localStorage.setItem('portfolio_analysis_output', JSON.stringify(resData.portfolioAnalysis));
+    } else if (localAnalysis) {
+     fetch('/api/save-portfolio-analysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(localAnalysis)
+     }).catch(() => {});
     }
    })
   .catch(() => {});
