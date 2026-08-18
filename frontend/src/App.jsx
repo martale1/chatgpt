@@ -476,10 +476,6 @@ export default function App() {
    setPdfProgress({ status: 'failed', percent: 0, phase: 'Seleziona almeno un titolo dalla tabella', ticker: '' });
    return;
   }
-  const params = new URLSearchParams({
-   watchlist: activeWatchlistName,
-   tickers: selectedTickers.join(','),
-   limit: String(selectedTickers.length),
   try {
    setPdfProgress({ status: 'running', percent: 1, phase: 'Avvio esportazione', ticker: '' });
    const startResponse = await fetch('/api/export-pdf', {
