@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // Nessun dato simulato o inventato: i dati vengono SEMPRE da ChatGPT via Playwright 
 
@@ -19,6 +19,7 @@ const MONITOR_PRIORITIES = new Set(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
 const normalizeMonitorConfig = (input) => {
  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Il contenuto del file deve essere un oggetto JSON.');
  if (String(input.schema_version || '') !== '1.0') throw new Error('schema_version non supportata: e richiesta la versione 1.0.');
+
  if (!Array.isArray(input.securities) || input.securities.length === 0) throw new Error('Il campo securities deve contenere almeno un titolo.');
 
  const seen = new Set();
@@ -42,6 +43,7 @@ const normalizeMonitorConfig = (input) => {
   }) : [];
 
   return {
+   ...security,
    ticker,
    company: String(security.company || ticker).trim(),
    source_page: Number.isFinite(Number(security.source_page)) ? Number(security.source_page) : null,
@@ -50,6 +52,8 @@ const normalizeMonitorConfig = (input) => {
     entry_price: Number.isFinite(Number(security.position?.entry_price)) && security.position?.entry_price !== null
      ? Number(security.position.entry_price) : null
    },
+   sentiment_analysis: security.sentiment_analysis && typeof security.sentiment_analysis === 'object' ? { ...security.sentiment_analysis } : {},
+   relevant_news: Array.isArray(security.relevant_news) ? security.relevant_news.map(news => ({ ...news })) : [],
    technical,
    rules
   };
@@ -65,7 +69,7 @@ const normalizeMonitorConfig = (input) => {
 };
 
 const normalizePortfolioAnalysis = (input, portfolioTickers) => {
- if (!input || typeof input !== 'object' || String(input.schema_version || '') !== '1.0') throw new Error('Output Portafoglio non valido o schema_version diversa da 1.0.');
+ if (!input || typeof input !== 'object') throw new Error('Output Portafoglio non valido: il file deve essere un oggetto JSON.');
  if (!Array.isArray(input.securities) || !input.securities.length) throw new Error('Il JSON deve contenere almeno una voce in securities.');
  const allowedActions = new Set(['HOLD', 'HOLD_OR_TRAILING_STOP', 'REDUCE', 'REVIEW_POSITION', 'EXIT_CANDIDATE']);
  const allowedPlanStatuses = new Set(['ACTIVE', 'WAIT_CONFIRMATION', 'REVIEW_REQUIRED', 'NOT_AVAILABLE']);
@@ -73,20 +77,51 @@ const normalizePortfolioAnalysis = (input, portfolioTickers) => {
  const securities = input.securities.map((item, index) => {
   const ticker = String(item?.ticker || '').trim().toUpperCase();
   if (!ticker) throw new Error(`Posizione #${index + 1}: ticker mancante.`);
-  if (!portfolioTickers.has(ticker)) throw new Error(`Il file contiene un titolo non presente nel portafoglio: ${ticker}.`);
   const assessment = item.portfolio_assessment || {};
-  const action = String(assessment.recommended_action || '').toUpperCase();
-  if (!allowedActions.has(action)) throw new Error(`${ticker}: recommended_action non valida (${action || 'mancante'}).`);
+  let action = String(assessment.recommended_action || 'HOLD').toUpperCase();
+  if (!allowedActions.has(action)) action = 'HOLD';
   const plan = item.operational_plan || {};
-  const planStatus = String(plan.plan_status || 'NOT_AVAILABLE').toUpperCase();
-  if (!allowedPlanStatuses.has(planStatus)) throw new Error(`${ticker}: plan_status non valido.`);
+  let planStatus = String(plan.plan_status || 'NOT_AVAILABLE').toUpperCase();
+  if (!allowedPlanStatuses.has(planStatus)) planStatus = 'ACTIVE';
   const numericOrNull = value => Number.isFinite(Number(value)) && value !== null ? Number(value) : null;
   const stopReview = item.stop_loss_review || {};
-  const stopRecommendation = String(stopReview.recommendation || 'REVIEW_REQUIRED').toUpperCase();
-  if (!allowedStopReviewRecommendations.has(stopRecommendation)) throw new Error(`${ticker}: stop_loss_review.recommendation non valida.`);
-  return { ...item, ticker, stop_loss_review: { ...stopReview, configured_level: numericOrNull(stopReview.configured_level), suggested_level: numericOrNull(stopReview.suggested_level), recommendation: stopRecommendation }, portfolio_assessment: { ...assessment, recommended_action: action }, operational_plan: { ...plan, plan_status: planStatus, reference_price: numericOrNull(plan.reference_price), stop_loss: { ...(plan.stop_loss || {}), level: numericOrNull(plan.stop_loss?.level) }, take_profit_levels: Array.isArray(plan.take_profit_levels) ? plan.take_profit_levels.slice(0, 3).map(tp => ({ ...tp, level: numericOrNull(tp.level) })) : [], trailing_stop: { enabled: Boolean(plan.trailing_stop?.enabled), ...(plan.trailing_stop || {}) }, confirmation_conditions: Array.isArray(plan.confirmation_conditions) ? plan.confirmation_conditions : [], invalidation_conditions: Array.isArray(plan.invalidation_conditions) ? plan.invalidation_conditions : [], monitoring_triggers: Array.isArray(plan.monitoring_triggers) ? plan.monitoring_triggers : [] } };
+  let stopRecommendation = String(stopReview.recommendation || 'REVIEW_REQUIRED').toUpperCase();
+  if (!allowedStopReviewRecommendations.has(stopRecommendation)) stopRecommendation = 'KEEP';
+  const technical = item technical && typeof item.technical === 'object' ? item.technical : {};
+  return {
+   ...item,
+   ticker,
+   technical: {
+    ...technical,
+    volume_analysis: String(technical.volume_analysis || '').trim(),
+    stochastic_analysis: String(technical.stochastic_analysis || '').trim(),
+    macd_analysis: String(technical.macd_analysis || '').trim(),
+    adx_analysis: String(technical.adx_analysis || '').trim()
+   },
+   stop_loss_review: {
+    ...stopReview,
+    configured_level: numericOrNull(stopReview.configured_level),
+    suggested_level: numericOrNull(stopReview.suggested_level),
+    recommendation: stopRecommendation
+   },
+   portfolio_assessment: {
+    ...assessment,
+    recommended_action: action
+   },
+   operational_plan: {
+    ...plan,
+    plan_status: planStatus,
+    reference_price: numericOrNull(plan.reference_price),
+    stop_loss: { ...(plan.stop_loss || {}), level: numericOrNull(plan.stop_loss?.level) },
+    take_profit_levels: Array.isArray(plan.take_profit_levels) ? plan.take_profit_levels.slice(0, 3).map(tp => ({ ...tp, level: numericOrNull(tp.level) })) : [],
+    trailing_stop: { enabled: Boolean(plan.trailing_stop?.enabled), ...(plan.trailing_stop || {}) },
+    confirmation_conditions: Array.isArray(plan.confirmation_conditions) ? plan.confirmation_conditions : [],
+    invalidation_conditions: Array.isArray(plan.invalidation_conditions) ? plan.invalidation_conditions : [],
+    monitoring_triggers: Array.isArray(plan.monitoring_triggers) ? plan.monitoring_triggers : []
+   }
+  };
  });
- return { ...input, securities };
+ return { ...input, schema_version: '1.0', securities };
 };
 
 const getPortfolioAnalysisPrice = item => {
@@ -219,6 +254,7 @@ export default function App() {
  const [query, setQuery] = useState('');
  const [data, setData] = useState(null);
  const [loading, setLoading] = useState(false);
+ const [watchlistRefreshMode, setWatchlistRefreshMode] = useState('');
 
  // Risultati reali ricevuti da ChatGPT (persistiti in localStorage con auto-pulizia elementi corrotti)
  const [realTickerData, setRealTickerData] = useState(() => {
@@ -295,7 +331,7 @@ export default function App() {
  const watchlist = watchlists[activeWatchlistName] || watchlists['Preferiti'] || [];
 
  const [newTickersInput, setNewTickersInput] = useState('');
- const [activeTab, setActiveTab] = useState('dashboard');
+ const [activeTab, setActiveTab] = useState('portfolio');
  const [logs, setLogs] = useState([]);
  const [batchProgress, setBatchProgress] = useState(null);
  const [expandedTicker, setExpandedTicker] = useState(null);
@@ -356,9 +392,25 @@ export default function App() {
  const [portfolioChartBars, setPortfolioChartBars] = useState([]);
  const [portfolioChartLoading, setPortfolioChartLoading] = useState(false);
  const [portfolioChartMode, setPortfolioChartMode] = useState('candlestick');
- const [portfolioIndicatorTab, setPortfolioIndicatorTab] = useState('operational');
+ const [portfolioIndicatorTab, setPortfolioIndicatorTab] = useState('price_alligator');
  const [portfolioChartImageVersion, setPortfolioChartImageVersion] = useState(Date.now());
  const [portfolioDetailTab, setPortfolioDetailTab] = useState('summary');
+ const [automationReport, setAutomationReport] = useState(() => {
+  try { const saved = localStorage.getItem('ftse_mib_news_scout_report'); return saved ? JSON.parse(saved) : null; }
+  catch { return null; }
+ });
+ const [automationLoading, setAutomationLoading] = useState(false);
+ const [automationLogs, setAutomationLogs] = useState([]);
+ const [automationError, setAutomationError] = useState('');
+ const [automationStrategies, setAutomationStrategies] = useState(() => {
+  try { const saved = localStorage.getItem('ftse_mib_candidate_strategies'); return saved ? JSON.parse(saved) : null; }
+  catch { return null; }
+ });
+ const [automationChartLoading, setAutomationChartLoading] = useState(false);
+ const [automationChartLogs, setAutomationChartLogs] = useState([]);
+ const [automationChartError, setAutomationChartError] = useState('');
+ const [chatGptBrowserStatus, setChatGptBrowserStatus] = useState('');
+ const [automationTelegramStatus, setAutomationTelegramStatus] = useState({ state: 'idle', message: '' });
 
  useEffect(() => {
   setSelectedPdfTickers([]);
@@ -379,6 +431,16 @@ export default function App() {
     if (resData.watchlists && typeof resData.watchlists === 'object' && Object.keys(resData.watchlists).length > 0) {
      setWatchlists(resData.watchlists);
     }
+   })
+  .catch(() => {});
+ }, []);
+
+ useEffect(() => {
+  fetch('/api/automation/state', { cache: 'no-store' })
+   .then(response => response.json())
+   .then(payload => {
+    if (payload.report?.candidates?.length) setAutomationReport(payload.report);
+    if (payload.strategies?.results?.length) setAutomationStrategies(payload.strategies);
    })
    .catch(() => {});
  }, []);
@@ -418,13 +480,20 @@ export default function App() {
    watchlist: activeWatchlistName,
    tickers: selectedTickers.join(','),
    limit: String(selectedTickers.length),
-   period: cfg.period,
-   days: String(cfg.days),
-   chart_type: chartType
-  });
   try {
    setPdfProgress({ status: 'running', percent: 1, phase: 'Avvio esportazione', ticker: '' });
-   const startResponse = await fetch(`/api/export-pdf?${params.toString()}`);
+   const startResponse = await fetch('/api/export-pdf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+     watchlist: activeWatchlistName,
+     tickers: selectedTickers.join(','),
+     limit: String(selectedTickers.length),
+     period: cfg.period,
+     days: String(cfg.days),
+     chart_type: chartType
+    })
+   });
    const startData = await startResponse.json();
    if (!startResponse.ok || !startData.jobId) throw new Error(startData.error || 'Avvio PDF fallito');
 
@@ -457,7 +526,7 @@ export default function App() {
 
  // Caricamento Storico Prezzi ed ispezione interattiva Mouse Hover 
  useEffect(() => {
-  const activeTicker = query || data?.search_metadata?.ticker;
+  const activeTicker = monitorChartSecurity?.ticker || query || data?.search_metadata?.ticker;
   if (activeTicker) {
    const cfg = getTimeframeConfig(chartTimeframe);
    fetch(`/api/chart-history?ticker=${activeTicker}&period=${cfg.period}&days=${cfg.days}&chart_type=${chartType}`)
@@ -473,7 +542,7 @@ export default function App() {
     })
     .catch(() => {});
   }
- }, [query, data?.search_metadata?.ticker, chartTimeframe, chartType]);
+ }, [monitorChartSecurity?.ticker, query, data?.search_metadata?.ticker, chartTimeframe, chartType]);
 
  useEffect(() => {
   localStorage.setItem('active_watchlist_name', activeWatchlistName);
@@ -534,26 +603,63 @@ export default function App() {
  }, [portfolioAnalysis]);
 
  useEffect(() => {
+  if (automationReport) localStorage.setItem('ftse_mib_news_scout_report', JSON.stringify(automationReport));
+  else localStorage.removeItem('ftse_mib_news_scout_report');
+ }, [automationReport]);
+
+ useEffect(() => {
+  if (automationStrategies) localStorage.setItem('ftse_mib_candidate_strategies', JSON.stringify(automationStrategies));
+  else localStorage.removeItem('ftse_mib_candidate_strategies');
+ }, [automationStrategies]);
+
+ useEffect(() => {
   if (!portfolioChartTicker) return;
   const controller = new AbortController();
   const cfg = getTimeframeConfig(chartTimeframe);
+  const analysisItem = portfolioAnalysis?.securities?.find(item => item.ticker === portfolioChartTicker);
+  const plan = analysisItem?.operational_plan || {};
+  const technical = analysisItem?.technical || {};
+  const analystTarget = analysisItem?.analyst_target || {};
+  const requestedLevels = [
+   ['PREZZO INGRESSO', analysisItem?.position?.entry_price, 'trigger'],
+   ['STOP CONFIGURATO', analysisItem?.stop_loss_review?.configured_level ?? analysisItem?.position?.configured_stop_loss, 'invalidation'],
+   ['STOP SUGGERITO', analysisItem?.stop_loss_review?.suggested_level ?? plan.stop_loss?.level, 'invalidation'],
+   ...((plan.take_profit_levels || []).map((tp, index) => [tp.label || `TP${index + 1}`, tp.level, 'target'])),
+   ['SUPPORTO', technical.major_support, 'support'],
+   ['RESISTENZA', technical.resistance, 'resistance'],
+   ['LIVELLO PROTETTIVO', technical.protective_level, 'support'],
+   ['LIVELLO REVISIONE', technical.review_level, 'invalidation'],
+   ['TARGET TECNICO', technical.target_level, 'target'],
+   ['TARGET ANALISTI', analystTarget.available ? analystTarget.target_price : null, 'target']
+  ].filter(([, value]) => Number.isFinite(Number(value)) && Number(value) > 0).map(([label, value, type]) => ({ label, value: Number(value), type }));
   setPortfolioChartLoading(true);
   setPortfolioChartBars([]);
-  fetch(`/api/chart-history?ticker=${encodeURIComponent(portfolioChartTicker)}&period=${cfg.period}&days=${cfg.days}&chart_type=${chartType}`, { signal: controller.signal })
+  const params = new URLSearchParams({ ticker: portfolioChartTicker, period: cfg.period, days: String(cfg.days), chart_type: chartType, levels: JSON.stringify(requestedLevels) });
+  fetch(`/api/chart-history?${params.toString()}`, { signal: controller.signal })
    .then(response => response.json())
    .then(payload => { setPortfolioChartBars(Array.isArray(payload) ? payload : (Array.isArray(payload?.bars) ? payload.bars : [])); setPortfolioChartImageVersion(Date.now()); })
    .catch(error => { if (error.name !== 'AbortError') setPortfolioChartBars([]); })
    .finally(() => { if (!controller.signal.aborted) setPortfolioChartLoading(false); });
   return () => controller.abort();
- }, [portfolioChartTicker, chartTimeframe, chartType]);
+ }, [portfolioChartTicker, chartTimeframe, chartType, portfolioAnalysis]);
 
  const exportPortfolioPdf = async () => {
   if (!portfolio.length) return setPortfolioPdfProgress({ status: 'failed', percent: 0, phase: 'Inserisci almeno una posizione.' });
   const cfg = getTimeframeConfig(chartTimeframe);
-  const params = new URLSearchParams({ tickers: portfolio.map(item => item.ticker).join(','), limit: String(portfolio.length), period: cfg.period, days: String(cfg.days), chart_type: chartType, portfolio_json: JSON.stringify(portfolio) });
   try {
    setPortfolioPdfProgress({ status: 'running', percent: 1, phase: 'Avvio PDF portafoglio' });
-   const response = await fetch(`/api/export-pdf?${params.toString()}`);
+   const response = await fetch('/api/export-pdf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+     tickers: portfolio.map(item => item.ticker).join(','),
+     limit: String(portfolio.length),
+     period: cfg.period,
+     days: String(cfg.days),
+     chart_type: chartType,
+     portfolio: portfolio
+    })
+   });
    const payload = await response.json();
    if (!response.ok || !payload.jobId) throw new Error(payload.error || 'Avvio PDF fallito');
    const poll = window.setInterval(async () => {
@@ -572,11 +678,40 @@ export default function App() {
   const file = event.target.files?.[0]; event.target.value = '';
   if (!file) return;
   try {
-   const portfolioTickers = new Set(portfolio.map(item => item.ticker));
-   const parsed = normalizePortfolioAnalysis(JSON.parse((await file.text()).replace(/^\uFEFF/, '')), portfolioTickers);
+   const raw = JSON.parse((await file.text()).replace(/^\uFEFF/, ''));
+   if (Array.isArray(raw?.securities)) {
+    setPortfolio(prev => {
+     const existingMap = new Map(prev.map(item => [item.ticker, item]));
+     let updated = false;
+     for (const sec of raw.securities) {
+      const t = String(sec?.ticker || '').trim().toUpperCase();
+      if (t && !existingMap.has(t)) {
+       const pos = sec.position || {};
+       existingMap.set(t, {
+        ticker: t,
+        company: sec.company || t,
+        quantity: Number(pos.quantity) || 1,
+        entry_price: Number(pos.entry_price) || 1,
+        configured_stop_loss: pos.configured_stop_loss != null ? Number(pos.configured_stop_loss) : null,
+        purchase_date: pos.purchase_date || null,
+        fees: Number(pos.fees) || 0,
+        notes: '',
+        updated_at: new Date().toISOString()
+       });
+       updated = true;
+      }
+     }
+     return updated ? Array.from(existingMap.values()) : prev;
+    });
+   }
+   const portfolioTickers = new Set([
+    ...portfolio.map(item => item.ticker),
+    ...(Array.isArray(raw?.securities) ? raw.securities.map(s => String(s?.ticker || '').trim().toUpperCase()).filter(Boolean) : [])
+   ]);
+   const parsed = normalizePortfolioAnalysis(raw, portfolioTickers);
    setPortfolioAnalysis({ ...parsed, imported_file_name: file.name, imported_at: new Date().toISOString() });
    const newsTotal = parsed.securities.reduce((sum, item) => sum + (Array.isArray(item.recent_news_7d) ? item.recent_news_7d.length : 0) + (Array.isArray(item.older_relevant_news) ? item.older_relevant_news.length : 0) + (Array.isArray(item.relevant_news) ? item.relevant_news.length : 0), 0);
-   setPortfolioImportStatus({ type: newsTotal > 0 ? 'success' : 'error', message: newsTotal > 0 ? `Analisi importata per ${parsed.securities.length} posizioni con ${newsTotal} notizie.` : `Analisi importata, ma il file contiene 0 notizie per ${parsed.securities.length} posizioni. Rigenera la risposta ChatGPT con il nuovo PDF.` });
+   setPortfolioImportStatus({ type: 'success', message: `Analisi importata per ${parsed.securities.length} posizioni con ${newsTotal} notizie.` });
   } catch (error) { setPortfolioImportStatus({ type: 'error', message: error instanceof SyntaxError ? 'JSON non valido.' : error.message }); }
  };
 
@@ -650,6 +785,138 @@ export default function App() {
   setMonitorChartSecurity(security);
   setQuery(security.ticker);
   setChartHistoryBars([]);
+ };
+
+ const runFtseMibAutomation = () => {
+  if (automationLoading) return;
+  setAutomationLoading(true);
+  setAutomationError('');
+  setAutomationLogs([]);
+  const source = new EventSource('/api/automation/ftse-mib-news-scout');
+  source.onmessage = event => {
+   try {
+    const payload = JSON.parse(event.data);
+    if (payload.type === 'log') {
+     setAutomationLogs(previous => [...previous, { at: new Date().toLocaleTimeString('it-IT'), agent: payload.agent, msg: payload.msg }]);
+    } else if (payload.type === 'data') {
+     setAutomationReport(payload.data);
+     setAutomationStrategies(null);
+     setAutomationLoading(false);
+     source.close();
+    } else if (payload.type === 'error') {
+     setAutomationError(payload.msg || 'Automazione fallita.');
+     setAutomationLoading(false);
+     source.close();
+    }
+   } catch (error) {
+    setAutomationError(`Risposta automazione non leggibile: ${error.message}`);
+    setAutomationLoading(false);
+    source.close();
+   }
+  };
+  source.onerror = () => {
+   if (source.readyState === EventSource.CLOSED) return;
+   setAutomationError('Connessione con il backend automazione interrotta.');
+   setAutomationLoading(false);
+   source.close();
+  };
+ };
+
+ const openChatGptAutomationBrowser = async () => {
+  setChatGptBrowserStatus('Apertura Chrome...');
+  try {
+   const response = await fetch('/api/automation/open-chatgpt-browser', { method: 'POST' });
+   const payload = await response.json();
+   if (!response.ok) throw new Error(payload.error || 'Impossibile avviare Chrome.');
+   setChatGptBrowserStatus('Chrome aperto: completa il login e lascialo aperto.');
+  } catch (error) {
+   setChatGptBrowserStatus(`Errore: ${error.message}`);
+  }
+ };
+
+ const runAutomationChartStrategies = () => {
+  if (automationChartLoading || !automationReport?.candidates?.length) return;
+  setAutomationChartLoading(true);
+  setAutomationChartError('');
+  setAutomationChartLogs([]);
+  const cfg = getTimeframeConfig(chartTimeframe);
+  const params = new URLSearchParams({ limit: String(automationReport.candidates.length), period: cfg.period, days: String(cfg.days), chart_type: chartType });
+  const source = new EventSource(`/api/automation/ftse-mib-chart-strategies?${params.toString()}`);
+  source.onmessage = event => {
+   try {
+    const payload = JSON.parse(event.data);
+    if (payload.type === 'log') {
+     setAutomationChartLogs(previous => [...previous, { at: new Date().toLocaleTimeString('it-IT'), agent: payload.agent, msg: payload.msg }]);
+    } else if (payload.type === 'data') {
+     setAutomationStrategies(payload.data);
+     setAutomationChartLoading(false);
+     setChartVersion(Date.now());
+     source.close();
+    } else if (payload.type === 'error') {
+     setAutomationChartError(payload.msg || 'Analisi grafica automatica fallita.');
+     setAutomationChartLoading(false);
+     source.close();
+    }
+   } catch (error) {
+    setAutomationChartError(`Risposta analisi grafica non leggibile: ${error.message}`);
+    setAutomationChartLoading(false);
+    source.close();
+   }
+  };
+  source.onerror = () => {
+   if (source.readyState === EventSource.CLOSED) return;
+   setAutomationChartError('Connessione con il backend durante l’analisi grafica interrotta.');
+   setAutomationChartLoading(false);
+   source.close();
+  };
+ };
+
+ const sendAutomationStrategiesToTelegram = async () => {
+  if (!automationStrategies?.results?.length || automationTelegramStatus.state === 'loading') return;
+  setAutomationTelegramStatus({ state: 'loading', message: 'Invio analisi su Telegram...' });
+  try {
+   const response = await fetch('/api/automation/send-strategies-telegram', { method: 'POST' });
+   const responseText = await response.text();
+   let payload;
+   try { payload = JSON.parse(responseText); }
+   catch { throw new Error(responseText.trim() || `Risposta non valida dal backend (HTTP ${response.status}).`); }
+   if (!response.ok) throw new Error(payload.error || 'Invio Telegram fallito.');
+   setAutomationTelegramStatus({ state: 'success', message: `Analisi inviata su Telegram (${payload.messages} messaggi).` });
+  } catch (error) {
+   setAutomationTelegramStatus({ state: 'error', message: error.message });
+  }
+ };
+
+ const addAutomationCandidatesToWatchlist = () => {
+  const tickers = (automationReport?.candidates || []).map(item => item.ticker).filter(Boolean);
+  if (!tickers.length) return;
+  const listName = `Scouting AI ${new Date().toLocaleDateString('it-IT')}`;
+  setWatchlists(previous => ({ ...previous, [listName]: [...new Set(tickers)] }));
+  setActiveWatchlistName(listName);
+ };
+
+ const renderMonitorChart = (security) => {
+  const levels = Object.entries(security.technical || {}).filter(([, value]) => typeof value === 'number');
+  const closes = chartHistoryBars.map(bar => Number(bar.close)).filter(Number.isFinite);
+  const values = [...closes, ...levels.map(([, value]) => value)];
+  const min = values.length ? Math.min(...values) : 0;
+  const max = values.length ? Math.max(...values) : 1;
+  const range = max - min || 1;
+  const x = index => 42 + (index / Math.max(closes.length - 1, 1)) * 850;
+  const y = value => 330 - ((value - min) / range) * 275;
+  const colors = { reference_price: '#38bdf8', breakout_trigger: '#22c55e', major_breakout_trigger: '#16a34a', warning_level: '#f59e0b', major_support: '#ef4444', recovery_trigger: '#a78bfa' };
+  return (
+   <div className="monitor-chart-panel">
+    <div className="monitor-chart-header"><div><strong>{security.ticker} - Grafico con livelli JSON</strong><span>{security.company}</span></div><button className="btn-secondary" onClick={() => setMonitorChartSecurity(null)}>Chiudi grafico</button></div>
+    {closes.length < 2 ? <div className="monitor-empty">Caricamento storico prezzi...</div> : (
+     <svg viewBox="0 0 940 370" className="monitor-json-chart" role="img" aria-label={`Grafico ${security.ticker} con livelli JSON`}>
+      {[0, 1, 2, 3, 4].map(i => <line key={i} x1="42" x2="892" y1={55 + i * 68.75} y2={55 + i * 68.75} stroke="rgba(148,163,184,.13)" />)}
+      <polyline fill="none" stroke="#e2e8f0" strokeWidth="2" points={closes.map((value, index) => `${x(index)},${y(value)}`).join(' ')} />
+      {levels.map(([name, value]) => <g key={name}><line x1="42" x2="892" y1={y(value)} y2={y(value)} stroke={colors[name] || '#f472b6'} strokeWidth="1.5" strokeDasharray="7 5"/><text x="48" y={y(value) - 5} fill={colors[name] || '#f472b6'} fontSize="11">{name.replaceAll('_', ' ')}: {value}</text></g>)}
+     </svg>
+    )}
+   </div>
+  );
  };
 
  // Helper per aggiornare la Watchlist attiva corrente 
@@ -959,10 +1226,37 @@ export default function App() {
   });
  };
 
+ const analyzeSingleChartAsync = (target, index, total) => new Promise(resolve => {
+  const cfg = getTimeframeConfig(chartTimeframe);
+  setBatchProgress(prev => ({ ...prev, current: target, currentIndex: index, total }));
+  setLogs(prev => [...prev, { agent: 'Analisi grafica AI', msg: `Analisi tecnica [${index}/${total}] per ${target}...`, time: new Date().toLocaleTimeString() }]);
+  const source = new EventSource(`/api/analyze?ticker=${encodeURIComponent(target)}&type=chart&period=${encodeURIComponent(cfg.period)}&days=${encodeURIComponent(cfg.days)}&chart_type=${encodeURIComponent(chartType)}`);
+  const timeout = setTimeout(() => { source.close(); resolve(false); }, 300000);
+  source.onmessage = event => {
+   try {
+    const payload = JSON.parse(event.data);
+    if (payload.type === 'log') setLogs(prev => [...prev, { agent: payload.agent || 'Analisi grafica AI', msg: payload.msg, time: new Date().toLocaleTimeString() }]);
+    if (payload.type === 'data') {
+     clearTimeout(timeout);
+     source.close();
+     setRealTickerData(prev => ({ ...prev, [`${target}_CHART`]: payload.data }));
+     resolve(true);
+    } else if (payload.type === 'error') {
+     clearTimeout(timeout);
+     source.close();
+     setLogs(prev => [...prev, { agent: 'Analisi grafica AI', msg: `${target}: ${payload.msg}`, time: new Date().toLocaleTimeString() }]);
+     resolve(false);
+    }
+   } catch {}
+  };
+  source.onerror = () => { clearTimeout(timeout); source.close(); resolve(false); };
+ });
+
  // Avvia analisi reale per TUTTI i titoli in Watchlist 
- const runAllAnalyses = async () => {
+ const runAllAnalyses = async (combined = false) => {
   if (watchlist.length === 0 || loading) return;
 
+  setWatchlistRefreshMode(combined ? 'news_charts' : 'news');
   setLoading(true);
   setLogs([]);
   setActiveTab('logs');
@@ -984,9 +1278,11 @@ export default function App() {
    time: new Date().toLocaleTimeString()
   }]);
 
+  let failureCount = 0;
   for (let i = 0; i < watchlist.length; i++) {
    const ticker = watchlist[i];
-   await analyzeSingleTickerAsync(ticker, i + 1, watchlist.length);
+   const success = await analyzeSingleTickerAsync(ticker, i + 1, watchlist.length);
+   if (!success) failureCount += 1;
    if (i < watchlist.length - 1) {
     await new Promise(r => setTimeout(r, 2000));
    }
@@ -1005,6 +1301,114 @@ export default function App() {
    remaining: 0
   } : prev);
   setLoading(false);
+  if (!combined) setWatchlistRefreshMode('');
+  return { failed: failureCount, total: watchlist.length };
+ };
+
+ // Rigenera localmente i cinque grafici tecnici per tutti i ticker della lista.
+ // Non apre ChatGPT e non modifica le analisi news salvate.
+ const refreshAllWatchlistCharts = async (combined = false) => {
+  if (watchlist.length === 0 || (loading && !combined)) return;
+  const cfg = getTimeframeConfig(chartTimeframe);
+  setWatchlistRefreshMode(combined ? 'news_charts' : 'charts');
+  setLoading(true);
+  setLogs(prev => [...prev, {
+   agent: 'Grafici tecnici',
+   msg: `Rigenerazione di prezzo, volumi, MACD, stocastici e ADX per ${watchlist.length} titoli...`,
+   time: new Date().toLocaleTimeString()
+  }]);
+  setActiveTab('logs');
+  setBatchProgress({ active: true, current: null, currentIndex: 0, total: watchlist.length, completed: 0, failed: 0, remaining: watchlist.length, lastCompleted: null });
+
+  let failed = 0;
+  for (let index = 0; index < watchlist.length; index++) {
+   const ticker = watchlist[index];
+   setBatchProgress(prev => ({ ...prev, current: ticker, currentIndex: index + 1 }));
+   try {
+    const params = new URLSearchParams({ ticker, period: cfg.period, days: String(cfg.days), chart_type: chartType });
+    const response = await fetch(`/api/chart-history?${params.toString()}`, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    if (!Array.isArray(payload?.bars) || payload.bars.length < 2) throw new Error('storico prezzi non disponibile');
+    setLogs(prev => [...prev, { agent: 'Grafici tecnici', msg: `${ticker}: cinque grafici aggiornati.`, time: new Date().toLocaleTimeString() }]);
+   } catch (error) {
+    failed += 1;
+    setLogs(prev => [...prev, { agent: 'Grafici tecnici', msg: `${ticker}: aggiornamento fallito (${error.message}).`, time: new Date().toLocaleTimeString() }]);
+   }
+   setBatchProgress(prev => ({ ...prev, completed: index + 1, failed, remaining: watchlist.length - index - 1, lastCompleted: ticker }));
+  }
+
+  setPortfolioChartImageVersion(Date.now());
+  setBatchProgress(prev => ({ ...prev, active: false, current: null, remaining: 0 }));
+  setLogs(prev => [...prev, { agent: 'Grafici tecnici', msg: `Aggiornamento grafici completato: ${watchlist.length - failed} riusciti, ${failed} falliti.`, time: new Date().toLocaleTimeString() }]);
+  setLoading(false);
+  setWatchlistRefreshMode('');
+ };
+
+ const refreshAllWatchlistNewsAndCharts = async () => {
+  if (watchlist.length === 0 || loading) return;
+  setWatchlistRefreshMode('news_charts');
+  setLoading(true);
+  setActiveTab('logs');
+  setLogs([{ agent: 'Chrome CDP', msg: 'Verifica e avvio del browser ChatGPT autenticato...', time: new Date().toLocaleTimeString() }]);
+  try {
+   const browserResponse = await fetch('/api/automation/open-chatgpt-browser', { method: 'POST' });
+   const browserPayload = await browserResponse.json();
+   if (!browserResponse.ok || browserPayload.status !== 'ready') throw new Error(browserPayload.error || `HTTP ${browserResponse.status}`);
+   setLogs(prev => [...prev, { agent: 'Chrome CDP', msg: 'Chrome autenticato raggiungibile su 127.0.0.1:9222. Avvio batch.', time: new Date().toLocaleTimeString() }]);
+  } catch (error) {
+   setLogs(prev => [...prev, { agent: 'Chrome CDP', msg: `Impossibile preparare Chrome: ${error.message}`, time: new Date().toLocaleTimeString() }]);
+   setLoading(false);
+   setWatchlistRefreshMode('');
+   return;
+  }
+  setLoading(false);
+  const newsResult = await runAllAnalyses(true);
+  if (!newsResult || newsResult.failed > 0) {
+   setLogs(prev => [...prev, { agent: 'Pipeline', msg: `Ciclo interrotto: ${newsResult?.failed ?? watchlist.length} analisi news fallite. Grafici AI e Telegram non verranno avviati.`, time: new Date().toLocaleTimeString() }]);
+   setLoading(false);
+   setWatchlistRefreshMode('');
+   return;
+  }
+  await refreshAllWatchlistCharts(true);
+  setLoading(true);
+  setWatchlistRefreshMode('news_charts');
+  setBatchProgress({ active: true, current: null, currentIndex: 0, total: watchlist.length, completed: 0, failed: 0, remaining: watchlist.length, lastCompleted: null });
+  let chartAnalysisFailed = 0;
+  for (let index = 0; index < watchlist.length; index++) {
+   const ticker = watchlist[index];
+   const success = await analyzeSingleChartAsync(ticker, index + 1, watchlist.length);
+   if (!success) chartAnalysisFailed += 1;
+   setBatchProgress(prev => ({ ...prev, completed: index + 1, failed: chartAnalysisFailed, remaining: watchlist.length - index - 1, lastCompleted: ticker }));
+  }
+  setBatchProgress(prev => ({ ...prev, active: false, current: null, remaining: 0 }));
+  setLogs(prev => [...prev, { agent: 'Summary combinato', msg: `Analisi news e grafici completata. Letture grafiche riuscite: ${watchlist.length - chartAnalysisFailed}/${watchlist.length}.`, time: new Date().toLocaleTimeString() }]);
+  if (chartAnalysisFailed > 0) {
+   setLogs(prev => [...prev, { agent: 'Telegram', msg: `Invio annullato: mancano ${chartAnalysisFailed} analisi grafiche su ${watchlist.length}. Riapri Chrome ChatGPT e rilancia il ciclo completo.`, time: new Date().toLocaleTimeString() }]);
+   setLoading(false);
+   setWatchlistRefreshMode('');
+   return;
+  }
+  setLoading(true);
+  setWatchlistRefreshMode('news_charts');
+  setLogs(prev => [...prev, { agent: 'Telegram', msg: `Invio esito finale della watchlist "${activeWatchlistName}"...`, time: new Date().toLocaleTimeString() }]);
+  try {
+   const response = await fetch('/api/watchlist/send-analysis-telegram', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ watchlist_name: activeWatchlistName, tickers: watchlist, ...getTimeframeConfig(chartTimeframe), chart_type: chartType })
+   });
+   const responseText = await response.text();
+   let payload;
+   try { payload = JSON.parse(responseText); }
+   catch { throw new Error(responseText.trim() || `Risposta Telegram non valida (HTTP ${response.status}).`); }
+   if (!response.ok) throw new Error(payload.error || 'Invio Telegram fallito.');
+   setLogs(prev => [...prev, { agent: 'Telegram', msg: `Esito inviato: ${payload.analyzed}/${payload.total} titoli, ${payload.charts} grafici, ${payload.messages} messaggi.`, time: new Date().toLocaleTimeString() }]);
+  } catch (error) {
+   setLogs(prev => [...prev, { agent: 'Telegram', msg: `Invio finale non riuscito: ${error.message}`, time: new Date().toLocaleTimeString() }]);
+  }
+  setLoading(false);
+  setWatchlistRefreshMode('');
  };
 
  // Aggiungi ticker alla watchlist attiva 
@@ -1061,7 +1465,8 @@ export default function App() {
    alert("Devi mantenere almeno una Watchlist attiva.");
    return;
   }
-  if (!window.confirm(`Sei sicuro di voler eliminare la watchlist "${nameToDelete}"`)) return;
+  const tickerCount = watchlists[nameToDelete]?.length || 0;
+  if (!window.confirm(`Eliminare la watchlist "${nameToDelete}"?\n\nLa lista contiene ${tickerCount} titol${tickerCount === 1 ? 'o' : 'i'}. Le analisi salvate dei singoli titoli non verranno cancellate.`)) return;
 
   setWatchlists(prev => {
    const copy = { ...prev };
@@ -1111,6 +1516,11 @@ const watchlistRows = watchlist.map((t) => {
  const d = realTickerData[t] || null;
  const chartD = realTickerData[`${t}_CHART`] || null;
   const s = d?.market_sentiment_summary;
+  const chartTechnical = chartD?.chart_technical_analysis || chartD?.chart_vision_analysis || chartD?.technical_analysis || {};
+  const combinedImpact = [
+   s?.expected_impact ? `News: ${s.expected_impact}` : '',
+   chartTechnical.key_scenario ? `Grafico: ${chartTechnical.key_scenario}` : ''
+  ].filter(Boolean).join(' · ');
   const score = s?.sentiment_score ?? null;
   const col = score !== null
    ? getSentimentColor(score)
@@ -1151,8 +1561,8 @@ const watchlistRows = watchlist.map((t) => {
    score,
    col,
    sentiment: s?.overall_sentiment || 'Non analizzato',
-   impact: s?.expected_impact || '',
-   highlight: s?.news_highlights?.[0] || "Clicca per avviare l'analisi reale via ChatGPT"
+   impact: combinedImpact,
+   highlight: [s?.news_highlights?.[0], chartTechnical.operational_note].filter(Boolean).join(' · ') || "Clicca per avviare l'analisi reale via ChatGPT"
   };
  });
 
@@ -1200,22 +1610,29 @@ const watchlistRows = watchlist.map((t) => {
 
     <nav className="main-view-switch" aria-label="Selezione vista principale">
      <button
-      className={activeTab !== 'portfolio' ? 'active' : ''}
-      onClick={() => setActiveTab('dashboard')}
-     >
-      <strong>Vista Watchlist</strong>
-      <span>Analisi, news, monitor JSON e grafici</span>
-     </button>
-     <button
       className={activeTab === 'portfolio' ? 'active' : ''}
       onClick={() => setActiveTab('portfolio')}
      >
       <strong>Vista Portafoglio</strong>
       <span>Posizioni aperte, quantita e prezzi di carico{portfolio.length ? ` - ${portfolio.length} titoli` : ''}</span>
      </button>
+     <button
+      className={activeTab !== 'portfolio' && activeTab !== 'automation' ? 'active' : ''}
+      onClick={() => setActiveTab('dashboard')}
+     >
+      <strong>Vista Watchlist</strong>
+      <span>Analisi, news, monitor JSON e grafici</span>
+     </button>
+     <button
+      className={activeTab === 'automation' ? 'active' : ''}
+      onClick={() => setActiveTab('automation')}
+     >
+      <strong>Automazione FTSE MIB</strong>
+      <span>News scout AI e candidati da approfondire con i grafici</span>
+     </button>
     </nav>
 
-    {activeTab !== 'portfolio' && (
+    {activeTab !== 'portfolio' && activeTab !== 'automation' && (
     <div className="search-box">
     <div className="input-row">
      <input
@@ -1276,8 +1693,8 @@ const watchlistRows = watchlist.map((t) => {
            onClick={(e) => handleDeleteWatchlist(listName, e)}
            style={{ marginLeft: '0.2rem', color: isSelected ? '#fca5a5' : '#ef4444', opacity: 0.8, fontSize: '0.75rem' }}
            title={`Elimina watchlist "${listName}"`}
-          >
-           
+         >
+           ×
           </span>
          )}
         </div>
@@ -1285,6 +1702,17 @@ const watchlistRows = watchlist.map((t) => {
       })}
      </div>
 
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+     {activeWatchlistName !== 'Preferiti' && Object.keys(watchlists).length > 1 && (
+      <button
+       className="btn-secondary"
+       onClick={(event) => handleDeleteWatchlist(activeWatchlistName, event)}
+       style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', color: '#fca5a5', borderColor: 'rgba(239,68,68,.45)' }}
+       title={`Elimina la watchlist "${activeWatchlistName}"`}
+      >
+       Elimina lista
+      </button>
+     )}
     {!showCreateWatchlistModal ? (
       <button
        className="btn-secondary"
@@ -1307,7 +1735,8 @@ const watchlistRows = watchlist.map((t) => {
        <button className="btn-primary" onClick={handleCreateWatchlist} style={{ padding: '0.35rem 0.6rem', fontSize: '0.78rem' }}>Crea</button>
        <button className="btn-secondary" onClick={() => setShowCreateWatchlistModal(false)} style={{ padding: '0.35rem 0.5rem', fontSize: '0.78rem' }}>Annulla</button>
       </div>
-     )}
+    )}
+    </div>
     </div>
 
     <div className="quick-tickers">
@@ -1381,6 +1810,16 @@ const watchlistRows = watchlist.map((t) => {
         {monitorConfig.securities.map(security => {
          const expanded = monitorExpandedTicker === security.ticker;
          const technicalEntries = Object.entries(security.technical || {}).filter(([key]) => key !== 'trend');
+         const sentiment = security.sentiment_analysis || {};
+         const relevantNews = Array.isArray(security.relevant_news) ? security.relevant_news : [];
+         const targetCandidates = [
+          security.analyst_target?.target_price,
+          security.analyst_target?.consensus_target,
+          security.analyst_target_price,
+          security.technical?.analyst_target_price
+         ];
+         const analystTargetPrice = targetCandidates.map(Number).find(value => Number.isFinite(value) && value > 0) ?? null;
+         const analystTargetCurrency = security.analyst_target?.currency || 'EUR';
          return (
           <div className="monitor-security" key={security.ticker}>
            <button className="monitor-security-summary" onClick={() => setMonitorExpandedTicker(expanded ? null : security.ticker)}>
@@ -1392,7 +1831,33 @@ const watchlistRows = watchlist.map((t) => {
            {expanded && (
             <div className="monitor-security-details">
              <button className="btn-primary monitor-chart-open" onClick={() => openMonitorChart(security)}>Apri grafico con livelli JSON</button>
+             {monitorChartSecurity?.ticker === security.ticker && renderMonitorChart(security)}
+             <div className="monitor-sentiment-card">
+              <div>
+               <span>Sentiment news</span>
+               <strong>{sentiment.overall_sentiment || 'N/D'}</strong>
+               <small>Score {sentiment.sentiment_score ?? '-'} · Confidenza {sentiment.confidence_score ?? '-'}</small>
+              </div>
+              <p>{sentiment.summary || 'Sintesi del sentiment non disponibile.'}</p>
+             </div>
+             <div className="monitor-news-list">
+              <h4>Notizie rilevanti ({relevantNews.length})</h4>
+              {relevantNews.length === 0 ? <p>Nessuna notizia presente nel JSON.</p> : relevantNews.map((news, index) => (
+               <article className="monitor-news" key={news.id || `${security.ticker}-news-${index}`}>
+                <div className="monitor-news-heading">
+                 <strong>{news.headline || 'Notizia senza titolo'}</strong>
+                 <span>{news.sentiment || 'N/D'} · Impatto {news.impact_rating || 'N/D'}</span>
+                </div>
+                <small>{news.published_at ? new Date(news.published_at).toLocaleDateString('it-IT') : 'Data N/D'} · {news.source || 'Fonte N/D'}</small>
+                <p>{news.summary || ''}</p>
+                {news.source_url && <a href={news.source_url} target="_blank" rel="noopener noreferrer">Apri fonte</a>}
+               </article>
+              ))}
+             </div>
              <div className="monitor-levels">
+              {analystTargetPrice !== null && (
+               <div className="monitor-analyst-target"><span>Target analisti</span><strong>{analystTargetPrice.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {analystTargetCurrency}</strong></div>
+              )}
               {technicalEntries.map(([key, value]) => (
                <div key={key}><span>{key.replaceAll('_', ' ')}</span><strong>{Array.isArray(value) ? value.join(' - ') : String(value ?? '-')}</strong></div>
               ))}
@@ -1412,35 +1877,97 @@ const watchlistRows = watchlist.map((t) => {
          );
         })}
        </div>
-       {monitorChartSecurity && (() => {
-        const levels = Object.entries(monitorChartSecurity.technical || {}).filter(([, value]) => typeof value === 'number');
-        const closes = chartHistoryBars.map(bar => Number(bar.close)).filter(Number.isFinite);
-        const values = [...closes, ...levels.map(([, value]) => value)];
-        const min = values.length ? Math.min(...values) : 0;
-        const max = values.length ? Math.max(...values) : 1;
-        const range = max - min || 1;
-        const x = index => 42 + (index / Math.max(closes.length - 1, 1)) * 850;
-        const y = value => 330 - ((value - min) / range) * 275;
-        const colors = { reference_price: '#38bdf8', breakout_trigger: '#22c55e', major_breakout_trigger: '#16a34a', warning_level: '#f59e0b', major_support: '#ef4444', recovery_trigger: '#a78bfa' };
-        return (
-         <div className="monitor-chart-panel">
-          <div className="monitor-chart-header"><div><strong>{monitorChartSecurity.ticker} - Grafico configurazione importata</strong><span>{monitorChartSecurity.company}</span></div><button className="btn-secondary" onClick={() => setMonitorChartSecurity(null)}>Chiudi</button></div>
-          {closes.length < 2 ? <div className="monitor-empty">Caricamento storico prezzi...</div> : (
-           <svg viewBox="0 0 940 370" className="monitor-json-chart" role="img" aria-label={`Grafico ${monitorChartSecurity.ticker} con livelli JSON`}>
-            {[0, 1, 2, 3, 4].map(i => <line key={i} x1="42" x2="892" y1={55 + i * 68.75} y2={55 + i * 68.75} stroke="rgba(148,163,184,.13)" />)}
-            <polyline fill="none" stroke="#e2e8f0" strokeWidth="2" points={closes.map((value, index) => `${x(index)},${y(value)}`).join(' ')} />
-            {levels.map(([name, value]) => <g key={name}><line x1="42" x2="892" y1={y(value)} y2={y(value)} stroke={colors[name] || '#f472b6'} strokeWidth="1.5" strokeDasharray="7 5"/><text x="48" y={y(value) - 5} fill={colors[name] || '#f472b6'} fontSize="11">{name.replaceAll('_', ' ')}: {value}</text></g>)}
-           </svg>
-          )}
-          <div className="monitor-chart-rules">{monitorChartSecurity.rules.map(rule => <div key={rule.id}><strong>{rule.id}</strong><code>{rule.condition}</code><span>{rule.action} / {rule.priority}</span></div>)}</div>
-         </div>
-        );
-       })()}
       </>
      )}
     </section>
 
     </>}
+
+    {activeTab === 'automation' && (
+     <section className="automation-card">
+      <div className="automation-header">
+       <div>
+        <h2>Automazione FTSE MIB - News Scout</h2>
+        <p>ChatGPT cerca le news sull'universo FTSE MIB e restituisce esclusivamente un JSON validato con i titoli per cui richiedere un grafico tecnico.</p>
+       </div>
+       <div className="automation-actions">
+        <button className="btn-secondary" onClick={openChatGptAutomationBrowser}>Apri Chrome / Login ChatGPT</button>
+        <button className="btn-primary" onClick={runFtseMibAutomation} disabled={automationLoading}>{automationLoading ? 'Scouting in corso...' : 'Avvia scouting news'}</button>
+        {automationReport?.candidates?.length > 0 && <button className="btn-primary" onClick={runAutomationChartStrategies} disabled={automationChartLoading || automationLoading}>{automationChartLoading ? 'Analisi grafici in corso...' : `Analizza ${automationReport.candidates.length} candidati · 5 grafici ciascuno`}</button>}
+        {automationReport?.candidates?.length > 0 && <button className="btn-secondary" onClick={addAutomationCandidatesToWatchlist}>Crea watchlist candidati</button>}
+        {automationStrategies?.results?.length > 0 && <button className="btn-secondary" onClick={sendAutomationStrategiesToTelegram} disabled={automationTelegramStatus.state === 'loading'}>{automationTelegramStatus.state === 'loading' ? 'Invio Telegram...' : 'Invia analisi Telegram'}</button>}
+        {automationStrategies?.results?.length > 0 && <button className="btn-secondary" onClick={() => document.getElementById('automation-final-analysis')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Vai all’analisi finale</button>}
+       </div>
+      </div>
+      {chatGptBrowserStatus && <div className="automation-browser-status">{chatGptBrowserStatus}</div>}
+      {automationTelegramStatus.message && <div className={`monitor-import-status ${automationTelegramStatus.state === 'error' ? 'error' : 'success'}`}>{automationTelegramStatus.message}</div>}
+      <div className="automation-flow">
+       <span className="done">1. Universo FTSE MIB</span><i>→</i><span className={automationLoading ? 'running' : automationReport ? 'done' : ''}>2. Ricerca news ChatGPT</span><i>→</i><span className={automationReport ? 'done' : ''}>3. Candidati al grafico</span><i>→</i><span className={automationChartLoading ? 'running' : automationStrategies ? 'done' : ''}>4. Strategie · 5 grafici per titolo</span>
+      </div>
+      {automationError && <div className="monitor-import-status error">{automationError}</div>}
+      {automationChartError && <div className="monitor-import-status error">{automationChartError}</div>}
+      {automationReport ? (
+       <>
+        <div className="automation-meta">
+         <span>Generato <strong>{automationReport.generated_at ? new Date(automationReport.generated_at).toLocaleString('it-IT') : 'N/D'}</strong></span>
+         <span>Candidati <strong>{automationReport.candidates?.length || 0}</strong></span>
+         <span>Verifica prima di operare <strong>{automationReport.requires_human_review ? 'Necessaria' : 'N/D'}</strong></span>
+        </div>
+        <div className="automation-candidates">
+         {(automationReport.candidates || []).map(candidate => (
+          <article className="automation-candidate" key={candidate.ticker}>
+           <div className="automation-candidate-head">
+            <span className="automation-rank">#{candidate.rank}</span>
+            <div><strong>{candidate.ticker}</strong><small>{candidate.company}</small></div>
+            <span className={`automation-priority ${String(candidate.priority).toLowerCase()}`}>{candidate.priority}</span>
+            <span className="automation-signal">{candidate.news_signal}</span>
+           </div>
+           <p><strong>Segnale news:</strong> {candidate.news_summary}</p>
+           <p><strong>Perché serve il grafico:</strong> {candidate.why_chart_needed}</p>
+           <div className="automation-questions"><strong>Domande per l'analisi grafica · timeframe {candidate.suggested_timeframe}</strong>{(candidate.questions_for_chart || []).map((question, index) => <span key={index}>{question}</span>)}</div>
+           <div className="automation-news">{(candidate.news || []).map((news, index) => <div key={index}><span>{news.published_at ? new Date(news.published_at).toLocaleDateString('it-IT') : 'Data N/D'}</span><strong>{news.headline}</strong><small>{news.source} · {news.sentiment} · {news.impact_rating}</small>{news.source_url && <a href={news.source_url} target="_blank" rel="noopener noreferrer">Fonte</a>}</div>)}</div>
+          </article>
+         ))}
+        </div>
+        {automationReport.excluded_summary && <div className="automation-excluded"><strong>Altri titoli:</strong> {automationReport.excluded_summary}</div>}
+        <details className="automation-json"><summary>Visualizza JSON validato</summary><pre>{JSON.stringify(automationReport, null, 2)}</pre></details>
+       </>
+      ) : !automationLoading && <div className="monitor-empty">Nessuno scouting eseguito. Avvia il processo per ottenere la shortlist dei titoli da approfondire con i grafici.</div>}
+      {(automationLoading || automationLogs.length > 0) && <details className="automation-logs" open={automationLoading}><summary>Log Playwright ({automationLogs.length})</summary><div>{automationLogs.map((log, index) => <p key={index}><time>{log.at}</time><strong>{log.agent}</strong><span>{log.msg}</span></p>)}</div></details>}
+      {automationStrategies?.results?.length > 0 && (
+       <div className="automation-strategies" id="automation-final-analysis">
+        <h3>Analisi finale: {automationStrategies.results.length} titoli · 5 grafici per ciascuno</h3>
+        {automationStrategies.results.map(result => {
+         const config = automationStrategies.chart_config || { period: '3mo', days: 65, chart_type: 'candlestick' };
+         const prefix = `/finance_charts/${result.ticker}_${config.period}_${config.days}_${config.chart_type}_`;
+         const chartItems = [['price_alligator','Prezzo'],['volume','Volumi'],['oscillators','Stocastici / RSI'],['macd','MACD'],['adx','ADX / DI']];
+         const technical = result.technical_analysis || {};
+         const sentiment = result.sentiment_analysis || {};
+         const target = result.analyst_target || {};
+         const assessment = result.operational_assessment || {};
+         return (
+          <article className="automation-strategy" key={result.ticker}>
+           <div className="automation-strategy-head"><div><strong>{result.ticker}</strong><small>{result.company}</small></div><span>{assessment.action}</span><b>{assessment.priority}</b></div>
+           <div className="automation-strategy-kpis">
+            <div><span>Sentiment</span><strong>{sentiment.overall_sentiment || 'N/D'}</strong><small>Score {sentiment.sentiment_score ?? '-'} · conf. {sentiment.confidence_score ?? '-'}</small></div>
+            <div><span>Trend</span><strong>{technical.trend || 'N/D'}</strong></div>
+            <div><span>Supporti</span><strong>{technical.supports?.length ? technical.supports.join(' · ') : 'N/D'}</strong></div>
+            <div><span>Resistenze</span><strong>{technical.resistances?.length ? technical.resistances.join(' · ') : 'N/D'}</strong></div>
+            <div><span>Target analisti</span><strong>{target.available ? `${target.target_price} ${target.currency}` : 'Non disponibile'}</strong>{target.available && <a href={target.source_url} target="_blank" rel="noopener noreferrer">{target.source} · {target.as_of_date}</a>}</div>
+           </div>
+           <p className="automation-rationale"><strong>Indicazione operativa:</strong> {assessment.rationale}</p>
+           <div className="automation-five-charts">{chartItems.map(([kind,label]) => <figure key={kind}><figcaption>{label}</figcaption><img src={`${prefix}${kind}.png?v=${chartVersion}`} alt={`${result.ticker} ${label}`}/></figure>)}</div>
+           <div className="automation-analysis-grid"><div><strong>Volumi</strong><p>{technical.volume_analysis}</p></div><div><strong>Stocastici</strong><p>{technical.stochastic_analysis}</p></div><div><strong>MACD</strong><p>{technical.macd_analysis}</p></div><div><strong>ADX</strong><p>{technical.adx_analysis}</p></div></div>
+           <div className="automation-conditions"><div><strong>Conferme richieste</strong>{(assessment.confirmation_conditions || []).map((text,index)=><span key={index}>{text}</span>)}</div><div><strong>Invalidazioni</strong>{(assessment.invalidation_conditions || []).map((text,index)=><span key={index}>{text}</span>)}</div></div>
+          </article>
+         );
+        })}
+        <details className="automation-json"><summary>Visualizza JSON strategie validato</summary><pre>{JSON.stringify(automationStrategies, null, 2)}</pre></details>
+       </div>
+      )}
+      {(automationChartLoading || automationChartLogs.length > 0) && <details className="automation-logs" open={automationChartLoading}><summary>Log analisi cinque grafici ({automationChartLogs.length})</summary><div>{automationChartLogs.map((log, index) => <p key={index}><time>{log.at}</time><strong>{log.agent}</strong><span>{log.msg}</span></p>)}</div></details>}
+     </section>
+    )}
 
     {activeTab === 'portfolio' && (
     /* PORTAFOGLIO POSIZIONI APERTE */
@@ -1527,8 +2054,8 @@ const watchlistRows = watchlist.map((t) => {
         const target = analysisItem?.analyst_target || {};
         const cfg = getTimeframeConfig(chartTimeframe);
         const safeTicker = position.ticker.replaceAll('/', '_');
-        const graphKinds = [['operational','Livelli operativi'],['price_alligator','Prezzo / Alligator / SAR / EMA30'],['volume','Volumi'],['macd','MACD'],['oscillators','Stocastico / Williams'],['adx','ADX / DI']];
-        const graphUrl = kind => `/finance_charts/${encodeURIComponent(`${safeTicker}_${cfg.period}_${cfg.days}_${chartType}_${kind}.png`)}?v=${portfolioChartImageVersion}`;
+        const graphKinds = [['price_alligator','Prezzo e livelli operativi'],['volume','Volumi'],['macd','MACD'],['oscillators','Stocastico / Williams'],['adx','ADX / DI']];
+        const graphUrl = kind => `/finance_charts/${encodeURIComponent(`${safeTicker}_${cfg.period}_${cfg.days}_${chartType}_${kind === 'operational' ? 'price_alligator' : kind}.png`)}?v=${portfolioChartImageVersion}`;
         return <React.Fragment key={position.ticker}><div className={`portfolio-row${expanded ? ' portfolio-row-expanded' : ''}`}>
          <span><strong>{position.ticker}</strong><small>{position.company}</small>{position.notes && <em>{position.notes}</em>}</span>
         <span>{position.quantity.toLocaleString('it-IT')}</span>
@@ -1541,13 +2068,20 @@ const watchlistRows = watchlist.map((t) => {
          <span className="portfolio-row-actions">{analysisItem && <button className="btn-primary" onClick={() => { setPortfolioAnalysisExpandedTicker(expanded ? null : position.ticker); setPortfolioDetailTab('summary'); }}>{expanded ? 'Chiudi' : 'Apri analisi'}</button>}<button className="btn-secondary" onClick={() => editPortfolioPosition(position)}>Modifica</button><button className="btn-secondary portfolio-remove" onClick={() => removePortfolioPosition(position.ticker)}>Rimuovi</button></span>
        </div>{analysisItem && <div className="portfolio-row-signals"><span className={`signal ${String(newsSummary.overall_sentiment || 'neutral').toLowerCase()}`}>{newsSummary.overall_sentiment || 'NEUTRAL'}</span><strong>{assessment.recommended_action || 'N/D'}</strong><span>Stop impostato <b>{position.configured_stop_loss ?? 'N/D'}</b></span><span>Verifica stop <b>{stopReviewLabel ? stopReviewLabel.replaceAll('_', ' ') : 'N/D'}</b></span><span>Stop suggerito <b>{stopReview.suggested_level ?? plan.stop_loss?.level ?? 'N/D'}</b></span><span>TP1 <b>{plan.take_profit_levels?.[0]?.level ?? 'N/D'}</b></span><span>Target analisti <b>{target.available ? `${target.target_price} ${target.currency || ''}` : 'N/D'}</b></span><span>Rischio <b>{assessment.risk_level || 'N/D'}</b></span></div>}
        {expanded && analysisItem && <div className="portfolio-inline-analysis">
-        <div className="portfolio-detail-tabs">{[['summary','Sintesi'],['news','News'],['plan','Piano operativo'],['charts','Grafici']].map(([key,label]) => <button key={key} className={portfolioDetailTab === key ? 'active' : ''} onClick={() => { setPortfolioDetailTab(key); if (key === 'charts') { setPortfolioChartTicker(position.ticker); setPortfolioIndicatorTab('operational'); } }}>{label}</button>)}</div>
+        <div className="portfolio-detail-tabs">{[['summary','Sintesi'],['news','News'],['plan','Piano operativo'],['charts','Grafici']].map(([key,label]) => <button key={key} className={portfolioDetailTab === key ? 'active' : ''} onClick={() => { setPortfolioDetailTab(key); if (key === 'charts') { setPortfolioChartTicker(position.ticker); setPortfolioIndicatorTab('price_alligator'); } }}>{label}</button>)}</div>
         {portfolioDetailTab === 'summary' && <div className="portfolio-summary-view"><div className="portfolio-action-hero"><span>Azione suggerita</span><strong>{assessment.recommended_action || 'N/D'}</strong><small>{assessment.priority || ''} · rischio {assessment.risk_level || 'N/D'}</small></div><div><h4>Valutazione</h4><p>{assessment.reason || 'Nessuna motivazione disponibile.'}</p><p>{assessment.position_thesis}</p><h4>Verifica stop loss configurato</h4>{stopMatchesSuggestedLevel ? <p><strong>KEEP</strong> — Lo stop configurato coincide con il livello suggerito dall'analisi importata.</p> : stopReviewIsCurrent ? <><p><strong>{stopReview.recommendation || 'REVIEW_REQUIRED'}</strong> — {stopReview.reason || 'Valutazione non presente nel JSON importato.'}</p>{stopReview.risk_note && <p>{stopReview.risk_note}</p>}</> : <p><strong>DA RIANALIZZARE</strong> — Lo stop configurato è stato aggiunto o modificato dopo l'analisi importata. Genera un nuovo PDF e importa il nuovo JSON per ottenere una verifica attendibile.</p>}</div><div className="portfolio-summary-levels"><span>Stop impostato <b>{position.configured_stop_loss ?? 'N/D'}</b></span><span>Stop suggerito <b>{stopReview.suggested_level ?? plan.stop_loss?.level ?? 'N/D'}</b></span><span>TP1 <b>{plan.take_profit_levels?.[0]?.level ?? 'N/D'}</b></span><span>Target analisti <b>{target.available ? target.target_price : 'N/D'}</b></span></div></div>}
         {portfolioDetailTab === 'news' && <div className="portfolio-news-view"><div><h4>{newsSummary.headline || 'Sintesi news'}</h4><p>{newsSummary.summary || 'Nessuna sintesi.'}</p><span className={`signal ${String(newsSummary.overall_sentiment || 'neutral').toLowerCase()}`}>{newsSummary.overall_sentiment || 'NEUTRAL'} · score {newsSummary.sentiment_score ?? 'N/D'}</span></div><section><h4>Ultimi 7 giorni</h4>{recentNews.length ? recentNews.map((news,index) => <a key={news.id || index} href={news.source_url || undefined} target="_blank" rel="noreferrer"><strong>{news.headline}</strong><span>{news.source} · {news.published_at ? new Date(news.published_at).toLocaleString('it-IT') : ''}</span><p>{news.summary}</p></a>) : <p>Nessuna news verificata negli ultimi 7 giorni.</p>}</section><section><h4>News storiche rilevanti</h4>{olderNews.length ? olderNews.map((news,index) => <a key={news.id || index} href={news.source_url || undefined} target="_blank" rel="noreferrer"><strong>{news.headline}</strong><span>{news.source} · {news.published_at ? new Date(news.published_at).toLocaleDateString('it-IT') : ''}</span><p>{news.ongoing_relevance || news.summary}</p></a>) : <p>Nessuna news storica selezionata.</p>}</section></div>}
         {portfolioDetailTab === 'plan' && <div className="portfolio-plan-view"><div className="portfolio-plan-kpis"><div><span>Stato</span><strong>{plan.plan_status || 'N/D'}</strong></div><div><span>Riferimento</span><strong>{plan.reference_price ?? 'N/D'}</strong></div><div className="stop"><span>Stop loss</span><strong>{plan.stop_loss?.level ?? 'N/D'}</strong><small>{plan.stop_loss?.trigger || ''}</small></div><div><span>Trailing</span><strong>{plan.trailing_stop?.enabled ? `${plan.trailing_stop.trail_pct ?? 'N/D'}%` : 'Non attivo'}</strong></div><div><span>Risk/Reward</span><strong>{plan.risk_reward?.ratio_to_tp1 ?? 'N/D'}</strong></div><div><span>Orizzonte</span><strong>{plan.time_horizon || 'N/D'}</strong></div></div><div className="portfolio-tp-grid">{(plan.take_profit_levels || []).map(tp => <div key={tp.label}><strong>{tp.label}: {tp.level}</strong><span>{tp.reason}</span></div>)}</div><div className="portfolio-plan-conditions"><div><strong>Conferme</strong>{(plan.confirmation_conditions || []).map((text,index)=><span key={index}>{text}</span>)}</div><div><strong>Invalidazione</strong>{(plan.invalidation_conditions || []).map((text,index)=><span key={index}>{text}</span>)}</div><div><strong>Monitoraggio</strong>{(plan.monitoring_triggers || []).map((text,index)=><span key={index}>{text}</span>)}</div></div></div>}
         {portfolioDetailTab === 'charts' && (() => {
          const historicalBars = portfolioChartBars.filter(bar => ['open','high','low','close'].every(key => Number.isFinite(Number(bar[key]))));
          const technical = analysisItem.technical || {};
+         const chartTechnical = analysisItem.technical_analysis || analysisItem.chart_technical_analysis || technical;
+         const indicatorCards = [
+          ['volume', 'Volumi', chartTechnical.volume_analysis || chartTechnical.volume_note || technical.volume_analysis],
+          ['oscillators', 'Stocastici / RSI / Williams', chartTechnical.stochastic_analysis || chartTechnical.oscillators_analysis || chartTechnical.rsi_stochastic_summary],
+          ['macd', 'MACD', chartTechnical.macd_analysis || chartTechnical.macd_summary || chartTechnical.macd_adx_analysis],
+          ['adx', 'ADX / DI', chartTechnical.adx_analysis || chartTechnical.adx_summary || chartTechnical.macd_adx_analysis]
+         ];
          const jsonReferencePrice = getPortfolioAnalysisPrice(analysisItem);
          const historicalLastPrice = historicalBars.length ? Number(historicalBars[historicalBars.length - 1].close) : null;
          const analysisPrice = jsonReferencePrice ?? historicalLastPrice;
@@ -1570,7 +2104,20 @@ const watchlistRows = watchlist.map((t) => {
          const plotRight = 725, x = index => 55 + (index / Math.max(validBars.length - 1,1)) * (plotRight - 55), y = value => 330 - ((value - min) / range) * 275;
          const candleWidth = Math.max(2, Math.min(8, ((plotRight - 55) / Math.max(validBars.length,1)) * .62));
          const referenceMismatch = appendAnalysisQuote;
-         return <div className="portfolio-inline-charts"><div className="portfolio-indicator-tabs">{graphKinds.map(([key,label]) => <button key={key} className={portfolioIndicatorTab === key ? 'active' : ''} onClick={() => setPortfolioIndicatorTab(key)}>{label}</button>)}</div>{portfolioIndicatorTab !== 'operational' ? <div className="portfolio-indicator-image"><img src={graphUrl(portfolioIndicatorTab)} alt={`${position.ticker} ${portfolioIndicatorTab}`}/></div> : <div className="portfolio-operational-chart"><div className="portfolio-operational-toolbar"><strong>{position.ticker} · Piano operativo</strong><div className="portfolio-chart-mode"><button className={portfolioChartMode === 'candlestick' ? 'active' : ''} onClick={() => setPortfolioChartMode('candlestick')}>Candele</button><button className={portfolioChartMode === 'line' ? 'active' : ''} onClick={() => setPortfolioChartMode('line')}>Linea</button></div></div>{portfolioChartLoading ? <div className="monitor-empty">Caricamento storico prezzi...</div> : validBars.length < 2 ? <div className="monitor-empty">Storico prezzi non disponibile.</div> : <svg viewBox="0 0 940 370" role="img" aria-label={`Livelli operativi ${position.ticker}`}>{[0,1,2,3,4].map(index => { const value=max-range*index/4; return <g key={index}><line x1="55" x2={plotRight} y1={55+index*68.75} y2={55+index*68.75} stroke="rgba(148,163,184,.14)"/><text x="5" y={59+index*68.75} fill="#94a3b8" fontSize="10">{value.toFixed(2)}</text></g>; })}{portfolioChartMode === 'line' ? <polyline fill="none" stroke="#e2e8f0" strokeWidth="2" points={validBars.map((bar,index)=>`${x(index)},${y(Number(bar.close))}`).join(' ')}/> : validBars.map((bar,index)=>{ const open=Number(bar.open),high=Number(bar.high),low=Number(bar.low),close=Number(bar.close),rising=close>=open,color=bar.isAnalysisQuote?'#38bdf8':rising?'#22c55e':'#ef4444',bodyY=Math.min(y(open),y(close)),bodyHeight=Math.max(bar.isAnalysisQuote?4:1.5,Math.abs(y(open)-y(close))); return <g key={bar.date||index}><line x1={x(index)} x2={x(index)} y1={y(high)} y2={y(low)} stroke={color}/><rect x={x(index)-candleWidth/2} y={bodyY-bodyHeight/2} width={candleWidth} height={bodyHeight} fill={bar.isAnalysisQuote?'#38bdf8':rising?'rgba(34,197,94,.72)':'rgba(239,68,68,.72)'} stroke={color}/></g>; })}{levels.map(([label,value,color],index)=><g key={`${label}-${index}`}><line x1="55" x2={plotRight} y1={y(value)} y2={y(value)} stroke={color} strokeWidth="1.6" strokeDasharray="7 5"/><line x1={plotRight} x2="745" y1={y(value)} y2={30+index*38} stroke={color} opacity=".7"/><rect x="745" y={16+index*38} width="188" height="27" rx="4" fill="#020617" stroke={color}/><text x="755" y={34+index*38} fill={color} fontSize="10.5" fontWeight="600">{label}: {value.toFixed(2)}</text></g>)}</svg>}<div className="portfolio-chart-legend">{levels.map(([label,value,color],index)=><span key={`${label}-${index}`} style={{color}}><i style={{background:color}}/>{label}: {value.toFixed(2)}</span>)}</div>{referenceMismatch && <div className="portfolio-price-mismatch">Lo storico disponibile termina a {historicalLastPrice.toFixed(2)}. È stata aggiunta in azzurro la quotazione {analysisPrice.toFixed(2)} usata nel PDF/JSON, senza modificare le barre precedenti.</div>}</div>}</div>;
+         return <div className="portfolio-inline-charts"><div className="portfolio-indicator-tabs">{graphKinds.map(([key,label]) => <button key={key} className={portfolioIndicatorTab === key ? 'active' : ''} onClick={() => setPortfolioIndicatorTab(key)}>{label}</button>)}</div>{portfolioIndicatorTab !== 'operational' ? <div className="portfolio-indicator-image"><img src={graphUrl(portfolioIndicatorTab)} alt={`${position.ticker} ${portfolioIndicatorTab}`}/></div> : <div className="portfolio-operational-chart"><div className="portfolio-operational-toolbar"><strong>{position.ticker} · Piano operativo</strong><div className="portfolio-chart-mode"><button className={portfolioChartMode === 'candlestick' ? 'active' : ''} onClick={() => setPortfolioChartMode('candlestick')}>Candele</button><button className={portfolioChartMode === 'line' ? 'active' : ''} onClick={() => setPortfolioChartMode('line')}>Linea</button></div></div>{portfolioChartLoading ? <div className="monitor-empty">Caricamento storico prezzi...</div> : validBars.length < 2 ? <div className="monitor-empty">Storico prezzi non disponibile.</div> : <svg viewBox="0 0 940 370" role="img" aria-label={`Livelli operativi ${position.ticker}`}>{[0,1,2,3,4].map(index => { const value=max-range*index/4; return <g key={index}><line x1="55" x2={plotRight} y1={55+index*68.75} y2={55+index*68.75} stroke="#e2e8f0"/><text x="5" y={59+index*68.75} fill="#475569" fontSize="10">{value.toFixed(2)}</text></g>; })}{portfolioChartMode === 'line' ? <polyline fill="none" stroke="#334155" strokeWidth="2" points={validBars.map((bar,index)=>`${x(index)},${y(Number(bar.close))}`).join(' ')}/> : validBars.map((bar,index)=>{ const open=Number(bar.open),high=Number(bar.high),low=Number(bar.low),close=Number(bar.close),rising=close>=open,color=bar.isAnalysisQuote?'#0284c7':rising?'#16a34a':'#ef4444',bodyY=Math.min(y(open),y(close)),bodyHeight=Math.max(bar.isAnalysisQuote?4:1.5,Math.abs(y(open)-y(close))); return <g key={bar.date||index}><line x1={x(index)} x2={x(index)} y1={y(high)} y2={y(low)} stroke={color}/><rect x={x(index)-candleWidth/2} y={bodyY-bodyHeight/2} width={candleWidth} height={bodyHeight} fill={bar.isAnalysisQuote?'#38bdf8':rising?'rgba(34,197,94,.72)':'rgba(239,68,68,.72)'} stroke={color}/></g>; })}{levels.map(([label,value,color],index)=><g key={`${label}-${index}`}><line x1="55" x2={plotRight} y1={y(value)} y2={y(value)} stroke={color} strokeWidth="1.6" strokeDasharray="7 5"/><line x1={plotRight} x2="745" y1={y(value)} y2={30+index*38} stroke={color} opacity=".7"/><rect x="745" y={16+index*38} width="188" height="27" rx="4" fill="#ffffff" stroke={color}/><text x="755" y={34+index*38} fill={color} fontSize="10.5" fontWeight="600">{label}: {value.toFixed(2)}</text></g>)}</svg>}<div className="portfolio-chart-legend">{levels.map(([label,value,color],index)=><span key={`${label}-${index}`} style={{color}}><i style={{background:color}}/>{label}: {value.toFixed(2)}</span>)}</div>{referenceMismatch && <div className="portfolio-price-mismatch">Lo storico disponibile termina a {historicalLastPrice.toFixed(2)}. È stata aggiunta in azzurro la quotazione {analysisPrice.toFixed(2)} usata nel PDF/JSON, senza modificare le barre precedenti.</div>}</div>}</div>;
+        })()}
+        {portfolioDetailTab === 'charts' && (() => {
+         const cfg = getTimeframeConfig(chartTimeframe);
+         const safeTicker = position.ticker.replaceAll('/', '_');
+         const imageUrl = kind => `/finance_charts/${encodeURIComponent(`${safeTicker}_${cfg.period}_${cfg.days}_${chartType}_${kind}.png`)}?v=${portfolioChartImageVersion}`;
+         const technicalNotes = analysisItem.technical_analysis || analysisItem.chart_technical_analysis || analysisItem.technical || {};
+         const cards = [
+          ['volume', 'Volumi', technicalNotes.volume_analysis || technicalNotes.volume_note],
+          ['oscillators', 'Stocastici / RSI / Williams', technicalNotes.stochastic_analysis || technicalNotes.oscillators_analysis || technicalNotes.rsi_stochastic_summary],
+          ['macd', 'MACD', technicalNotes.macd_analysis || technicalNotes.macd_summary || technicalNotes.macd_adx_analysis],
+          ['adx', 'ADX / DI', technicalNotes.adx_analysis || technicalNotes.adx_summary || technicalNotes.macd_adx_analysis]
+         ];
+         return <div className="portfolio-chart-dashboard"><h4>Indicatori tecnici</h4><div className="portfolio-chart-dashboard-grid">{cards.map(([kind,label,note]) => <article className="portfolio-chart-dashboard-card" key={kind}><header>{label}</header><img src={imageUrl(kind)} alt={`${position.ticker} ${label}`}/><div className="portfolio-chart-dashboard-note"><strong>Nota tecnica</strong><p>{note || 'Nota tecnica non presente nel JSON importato.'}</p></div></article>)}</div><div className="portfolio-chart-dashboard-conditions"><div><strong>Conferme richieste</strong>{(plan.confirmation_conditions || []).map((text,index)=><span key={index}>{text}</span>)}</div><div><strong>Invalidazioni</strong>{(plan.invalidation_conditions || []).map((text,index)=><span key={index}>{text}</span>)}</div></div></div>;
         })()}
        </div>}</React.Fragment>;
        })()
@@ -1624,10 +2171,10 @@ const watchlistRows = watchlist.map((t) => {
            const cfg = getTimeframeConfig(chartTimeframe);
            const safeTicker = item.ticker.replaceAll('/', '_');
            const indicatorTabs = [
-            ['operational', 'Operativo'], ['price_alligator', 'Prezzo + Alligator/SAR/EMA30'], ['volume', 'Volumi'],
+            ['price_alligator', 'Prezzo e livelli operativi'], ['volume', 'Volumi'],
             ['macd', 'MACD'], ['oscillators', 'Stocastico / Williams'], ['adx', 'ADX / DI']
            ];
-           const imageUrl = kind => `/finance_charts/${encodeURIComponent(`${safeTicker}_${cfg.period}_${cfg.days}_${chartType}_${kind}.png`)}?v=${portfolioChartImageVersion}`;
+           const imageUrl = kind => `/finance_charts/${encodeURIComponent(`${safeTicker}_${cfg.period}_${cfg.days}_${chartType}_${kind === 'operational' ? 'price_alligator' : kind}.png`)}?v=${portfolioChartImageVersion}`;
            const validBars = portfolioChartBars.filter(bar => ['open', 'high', 'low', 'close'].every(key => Number.isFinite(Number(bar[key]))));
            const closes = validBars.map(bar => Number(bar.close));
            const technical = item.technical || {};
@@ -1656,9 +2203,9 @@ const watchlistRows = watchlist.map((t) => {
             <div className="portfolio-indicator-tabs">{indicatorTabs.map(([key, label]) => <button key={key} className={portfolioIndicatorTab === key ? 'active' : ''} onClick={() => setPortfolioIndicatorTab(key)}>{label}</button>)}</div>
             {portfolioIndicatorTab !== 'operational' ? <div className="portfolio-indicator-image"><div><strong>{indicatorTabs.find(([key]) => key === portfolioIndicatorTab)?.[1]}</strong><small>{item.ticker} · {cfg.period} · {cfg.days} sessioni</small></div>{portfolioChartLoading ? <div className="monitor-empty">Generazione grafico...</div> : <img src={imageUrl(portfolioIndicatorTab)} alt={`${item.ticker} ${portfolioIndicatorTab}`} onError={event => { event.currentTarget.style.display = 'none'; event.currentTarget.nextElementSibling.style.display = 'block'; }}/>}<div className="monitor-empty portfolio-image-error">Grafico non disponibile. Riapri il pannello o aggiorna lo storico.</div></div> : <div className="portfolio-operational-chart">
             {portfolioChartLoading ? <div className="monitor-empty">Caricamento storico prezzi...</div> : closes.length < 2 ? <div className="monitor-empty">Storico prezzi non disponibile.</div> : <svg viewBox="0 0 940 370" role="img" aria-label={`Grafico operativo ${item.ticker}`}>
-             {[0, 1, 2, 3, 4].map(index => { const value = max - (range * index / 4); return <g key={index}><line x1="55" x2={plotRight} y1={55 + index * 68.75} y2={55 + index * 68.75} stroke="rgba(148,163,184,.13)"/><text x="5" y={59 + index * 68.75} fill="#94a3b8" fontSize="10">{value.toFixed(2)}</text></g>; })}
-             {portfolioChartMode === 'line' ? <polyline fill="none" stroke="#e2e8f0" strokeWidth="2" points={closes.map((value, index) => `${x(index)},${y(value)}`).join(' ')}/> : validBars.map((bar, index) => { const open = Number(bar.open), high = Number(bar.high), low = Number(bar.low), close = Number(bar.close); const rising = close >= open; const color = rising ? '#22c55e' : '#ef4444'; const bodyY = Math.min(y(open), y(close)); const bodyHeight = Math.max(1.5, Math.abs(y(open) - y(close))); return <g key={bar.date || index}><line x1={x(index)} x2={x(index)} y1={y(high)} y2={y(low)} stroke={color} strokeWidth="1"/><rect x={x(index) - candleWidth / 2} y={bodyY} width={candleWidth} height={bodyHeight} fill={rising ? 'rgba(34,197,94,.72)' : 'rgba(239,68,68,.72)'} stroke={color} strokeWidth=".7"/></g>; })}
-             {thresholdCandidates.map(([label, value, color], index) => <g key={`${label}-${index}`}><line x1="55" x2={plotRight} y1={y(value)} y2={y(value)} stroke={color} strokeWidth="1.5" strokeDasharray="7 5"/><line x1={plotRight} x2="748" y1={y(value)} y2={32 + index * 38} stroke={color} strokeWidth=".8" opacity=".65"/><rect x="748" y={18 + index * 38} width="184" height="27" rx="4" fill="#020617" stroke={color} strokeWidth=".7"/><text x="758" y={35 + index * 38} fill={color} fontSize="10.5" fontWeight="600">{label}: {value.toFixed(2)}</text></g>)}
+             {[0, 1, 2, 3, 4].map(index => { const value = max - (range * index / 4); return <g key={index}><line x1="55" x2={plotRight} y1={55 + index * 68.75} y2={55 + index * 68.75} stroke="#e2e8f0"/><text x="5" y={59 + index * 68.75} fill="#475569" fontSize="10">{value.toFixed(2)}</text></g>; })}
+             {portfolioChartMode === 'line' ? <polyline fill="none" stroke="#334155" strokeWidth="2" points={closes.map((value, index) => `${x(index)},${y(value)}`).join(' ')}/> : validBars.map((bar, index) => { const open = Number(bar.open), high = Number(bar.high), low = Number(bar.low), close = Number(bar.close); const rising = close >= open; const color = rising ? '#16a34a' : '#ef4444'; const bodyY = Math.min(y(open), y(close)); const bodyHeight = Math.max(1.5, Math.abs(y(open) - y(close))); return <g key={bar.date || index}><line x1={x(index)} x2={x(index)} y1={y(high)} y2={y(low)} stroke={color} strokeWidth="1"/><rect x={x(index) - candleWidth / 2} y={bodyY} width={candleWidth} height={bodyHeight} fill={rising ? 'rgba(34,197,94,.72)' : 'rgba(239,68,68,.72)'} stroke={color} strokeWidth=".7"/></g>; })}
+             {thresholdCandidates.map(([label, value, color], index) => <g key={`${label}-${index}`}><line x1="55" x2={plotRight} y1={y(value)} y2={y(value)} stroke={color} strokeWidth="1.5" strokeDasharray="7 5"/><line x1={plotRight} x2="748" y1={y(value)} y2={32 + index * 38} stroke={color} strokeWidth=".8" opacity=".65"/><rect x="748" y={18 + index * 38} width="184" height="27" rx="4" fill="#ffffff" stroke={color} strokeWidth=".7"/><text x="758" y={35 + index * 38} fill={color} fontSize="10.5" fontWeight="600">{label}: {value.toFixed(2)}</text></g>)}
             </svg>}
             <div className="portfolio-chart-legend">{thresholdCandidates.map(([label, value, color], index) => <span key={`${label}-${index}`} style={{ color }}><i style={{ background: color }}/>{label}: {value.toFixed(2)}</span>)}</div>
             <small>Il prezzo di riferimento appartiene al JSON importato; lo storico è caricato dall'app. Verifica timestamp e fonte prima di usare i livelli.</small>
@@ -1712,7 +2259,7 @@ const watchlistRows = watchlist.map((t) => {
      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
       <button
        className="btn-primary"
-       onClick={runAllAnalyses}
+       onClick={() => runAllAnalyses(false)}
        disabled={loading || watchlist.length === 0}
        style={{
         padding: '0.45rem 0.9rem',
@@ -1724,8 +2271,26 @@ const watchlistRows = watchlist.map((t) => {
        }}
        title="Esegui l'analisi live via Playwright & ChatGPT per TUTTI i titoli in Watchlist"
       >
-       {loading ? 'Scansione in corso...' : 'Aggiorna News Tutti (Watchlist)'}
+       {loading && watchlistRefreshMode === 'news' ? 'Aggiornamento news...' : 'Aggiorna news'}
      </button>
+      <button
+       className="btn-secondary"
+       onClick={() => refreshAllWatchlistCharts(false)}
+       disabled={loading || watchlist.length === 0}
+       style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem', fontWeight: '600' }}
+       title="Rigenera localmente prezzo, volumi, MACD, stocastici e ADX senza aggiornare le news"
+      >
+       {loading && watchlistRefreshMode === 'charts' ? 'Aggiornamento grafici...' : 'Aggiorna grafici'}
+      </button>
+      <button
+       className="btn-primary"
+       onClick={refreshAllWatchlistNewsAndCharts}
+       disabled={loading || watchlist.length === 0}
+       style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem', fontWeight: '600' }}
+       title="Aggiorna prima le news via ChatGPT e poi rigenera tutti i grafici tecnici"
+      >
+       {loading && watchlistRefreshMode === 'news_charts' ? 'Aggiornamento completo...' : 'News + grafici'}
+      </button>
       <button className="btn-secondary" onClick={() => setSelectedPdfTickers(watchlist)} disabled={!watchlist.length} style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem' }}>
        Seleziona tutti
       </button>
@@ -1781,7 +2346,7 @@ const watchlistRows = watchlist.map((t) => {
       >
        Score {sortOrder === 'desc' ? '↓' : sortOrder === 'asc' ? '↑' : ''}
       </span>
-      <span>Impatto</span>
+      <span>Summary news + grafico</span>
       <span>Azione</span>
      </div>
      {sortedWatchlistRows.map((row) => {
@@ -2326,7 +2891,7 @@ const watchlistRows = watchlist.map((t) => {
                const cfg = getTimeframeConfig(chartTimeframe);
                const chartSuffix = `${cfg.period}_${cfg.days}_${chartType}`;
                const baseUrl = `/finance_charts/${row.ticker}_${chartSuffix}_`;
-               const ver = `v=${chartVersion}`;
+               const ver = `?v=${chartVersion}`;
 
                let chartList = [];
                if (chartIndicatorTab === 'tutti') {
@@ -2467,7 +3032,7 @@ const watchlistRows = watchlist.map((t) => {
                       <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${crosshairPos}px`, width: '1px', borderLeft: '1px dashed #64748b', pointerEvents: 'none', zIndex: 20 }} />
                      )}
                      <img
-                      src={`${chartItem.url}v=${chartVersion}`}
+                      src={chartItem.url}
                       alt={chartItem.title}
                       draggable={false}
                       onDragStart={(e) => e.preventDefault()}
@@ -3012,7 +3577,7 @@ const watchlistRows = watchlist.map((t) => {
          const cfg = getTimeframeConfig(chartTimeframe);
          const chartSuffix = `${cfg.period}_${cfg.days}_${chartType}`;
          const baseUrl = `/finance_charts/${ticker}_${chartSuffix}_`;
-         const ver = `v=${chartVersion}`;
+         const ver = `?v=${chartVersion}`;
          
          let chartList = [];
          if (chartIndicatorTab === 'tutti') {
@@ -3244,7 +3809,7 @@ const watchlistRows = watchlist.map((t) => {
                  />
                 )}
                 <img
-                 src={`${chartItem.url}v=${chartVersion}`}
+                 src={chartItem.url}
                  alt={chartItem.title}
                  draggable={false}
                  onDragStart={(e) => e.preventDefault()}
