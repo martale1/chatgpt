@@ -87,7 +87,7 @@ const normalizePortfolioAnalysis = (input, portfolioTickers) => {
   const stopReview = item.stop_loss_review || {};
   let stopRecommendation = String(stopReview.recommendation || 'REVIEW_REQUIRED').toUpperCase();
   if (!allowedStopReviewRecommendations.has(stopRecommendation)) stopRecommendation = 'KEEP';
-  const technical = item technical && typeof item.technical === 'object' ? item.technical : {};
+  const technical = item.technical && typeof item.technical === 'object' ? item.technical : {};
   return {
    ...item,
    ticker,
